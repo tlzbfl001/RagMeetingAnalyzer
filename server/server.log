@@ -1,0 +1,4 @@
+🚀 RAG 회의 분석 서버가 http://localhost:3000에서 실행 중입니다.
+📊 API 엔드포인트: http://localhost:3000/api
+🔍 Ollama 호스트: http://localhost:11434
+🤖 AI 모델: llama3.2:3b

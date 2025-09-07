@@ -1,0 +1,23 @@
+
+> rag-meeting-server@1.0.0 dev
+> nodemon server.js
+
+[33m[nodemon] 3.1.10[39m
+[33m[nodemon] to restart at any time, enter `rs`[39m
+[33m[nodemon] watching path(s): *.*[39m
+[33m[nodemon] watching extensions: js,mjs,cjs,json[39m
+[32m[nodemon] starting `node server.js`[39m
+저장된 분석 히스토리 10개 로드됨
+저장된 학습 데이터 로드됨
+🚀 RAG 회의 분석 서버가 http://localhost:3000에서 실행 중입니다.
+📊 API 엔드포인트: http://localhost:3000/api
+🔍 Ollama 호스트: http://localhost:11434
+🤖 AI 모델: llama3.2:3b
+☁️ AWS 환경: 비활성화 (로컬 파일 시스템 사용)
+uploads 폴더가 이미 존재합니다: /Users/yej/Desktop/rag-system/server/uploads
+(node:20714) NOTE: The AWS SDK for JavaScript (v2) is in maintenance mode.
+ SDK releases are limited to address critical bug fixes and security issues only.
+
+Please migrate your code to use AWS SDK for JavaScript (v3).
+For more information, check the blog post at https://a.co/cUPnyil
+(Use `node --trace-warnings ...` to show where the warning was created)

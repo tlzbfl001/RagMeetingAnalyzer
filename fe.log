@@ -1,0 +1,37 @@
+
+  VITE v5.4.19  ready in 485 ms
+
+  ➜  Local:   http://localhost:5175/
+  ➜  Network: http://172.30.1.78:5175/
+  ➜  press h + enter to show help
+4:57:04 PM [vite-plugin-svelte] /Users/yej/Desktop/rag-system/src/routes/+layout.svelte:19:1 Unused CSS selector "body"
+4:57:04 PM [vite-plugin-svelte] /Users/yej/Desktop/rag-system/src/routes/+layout.svelte:19:1 Unused CSS selector "body"
+4:57:12 PM [vite-plugin-svelte] /Users/yej/Desktop/rag-system/src/routes/history/+page.svelte:309:2 A11y: visible, non-interactive elements with an on:click event must be accompanied by a keyboard event handler. Consider whether an interactive element such as <button type="button"> or <a> might be more appropriate. See https://svelte.dev/docs/accessibility-warnings#a11y-click-events-have-key-events for more details.
+4:57:12 PM [vite-plugin-svelte] /Users/yej/Desktop/rag-system/src/routes/history/+page.svelte:309:2 A11y: <div> with click handler must have an ARIA role
+4:57:12 PM [vite-plugin-svelte] /Users/yej/Desktop/rag-system/src/routes/history/+page.svelte:308:1 A11y: visible, non-interactive elements with an on:click event must be accompanied by a keyboard event handler. Consider whether an interactive element such as <button type="button"> or <a> might be more appropriate. See https://svelte.dev/docs/accessibility-warnings#a11y-click-events-have-key-events for more details.
+4:57:12 PM [vite-plugin-svelte] /Users/yej/Desktop/rag-system/src/routes/history/+page.svelte:308:1 A11y: <div> with click handler must have an ARIA role
+4:57:12 PM [vite-plugin-svelte] /Users/yej/Desktop/rag-system/src/routes/history/+page.svelte:792:1 Unused CSS selector ".detail-section"
+4:57:12 PM [vite-plugin-svelte] /Users/yej/Desktop/rag-system/src/routes/history/+page.svelte:796:1 Unused CSS selector ".detail-section h3"
+4:57:12 PM [vite-plugin-svelte] /Users/yej/Desktop/rag-system/src/routes/history/+page.svelte:804:1 Unused CSS selector ".detail-section p"
+4:57:12 PM [vite-plugin-svelte] /Users/yej/Desktop/rag-system/src/routes/history/+page.svelte:811:1 Unused CSS selector ".speakers-list"
+4:57:12 PM [vite-plugin-svelte] /Users/yej/Desktop/rag-system/src/routes/history/+page.svelte:837:1 Unused CSS selector ".keywords-list"
+4:57:12 PM [vite-plugin-svelte] /Users/yej/Desktop/rag-system/src/routes/history/+page.svelte:843:1 Unused CSS selector ".keyword-tag"
+4:57:12 PM [vite-plugin-svelte] /Users/yej/Desktop/rag-system/src/routes/history/+page.svelte:947:1 Unused CSS selector ".modal-footer"
+4:57:12 PM [vite-plugin-svelte] /Users/yej/Desktop/rag-system/src/routes/history/+page.svelte:1220:2 Unused CSS selector ".sentiment-info"
+
+Google Chrome is requesting /.well-known/appspecific/com.chrome.devtools.json to automatically configure devtools project settings. To learn why, and how to prevent this message, see https://svelte.dev/docs/cli/devtools-json
+
+5:05:06 PM [vite] hmr update /src/routes/+page.svelte
+
+[1;31m[404] GET /favicon.ico[0m
+5:08:03 PM [vite] hmr update /src/routes/+page.svelte
+
+[1;31m[404] GET /favicon.ico[0m
+
+[1;31m[404] GET /favicon.ico[0m
+6:07:06 PM [vite] hmr update /src/routes/+page.svelte
+6:08:03 PM [vite] hmr update /src/routes/+page.svelte
+6:08:11 PM [vite] hmr update /src/routes/+page.svelte
+6:08:12 PM [vite-plugin-svelte] /Users/yej/Desktop/rag-system/src/routes/+page.svelte:489:3 A11y: visible, non-interactive elements with an on:click event must be accompanied by a keyboard event handler. Consider whether an interactive element such as <button type="button"> or <a> might be more appropriate. See https://svelte.dev/docs/accessibility-warnings#a11y-click-events-have-key-events for more details.
+6:08:12 PM [vite-plugin-svelte] /Users/yej/Desktop/rag-system/src/routes/+page.svelte:489:3 A11y: <div> with click handler must have an ARIA role
+6:08:21 PM [vite] hmr update /src/routes/+page.svelte

@@ -1,0 +1,48 @@
+{
+	"name": "rag-system",
+	"version": "0.0.1",
+	"private": true,
+	"scripts": {
+		"build": "vite build",
+		"dev": "vite dev",
+		"preview": "vite preview",
+		"check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
+		"check:watch": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json --watch",
+		"lint": "prettier --plugin-search-dir . --check . && eslint .",
+		"format": "prettier --plugin-search-dir . --write .",
+		"test": "vitest",
+		"test:ui": "vitest --ui",
+		"server:dev": "tsx watch server/src/index.ts",
+		"server:build:index": "node --env-file=.env --import tsx ./server/scripts/build-index.mts",
+		"server:build:lambda": "esbuild server/src/handler.ts --bundle --platform=node --format=esm --outfile=dist/handler.mjs"
+	},
+	"devDependencies": {
+		"@sveltejs/adapter-auto": "^3.0.0",
+		"@sveltejs/kit": "^2.0.0",
+		"@sveltejs/vite-plugin-svelte": "^3.0.0",
+		"@types/node": "^20.14.10",
+		"@typescript-eslint/eslint-plugin": "^6.0.0",
+		"@typescript-eslint/parser": "^6.0.0",
+		"esbuild": "^0.24.0",
+		"eslint": "^8.28.0",
+		"eslint-config-prettier": "^8.5.0",
+		"eslint-plugin-svelte": "^2.30.0",
+		"jsdom": "^26.1.0",
+		"prettier": "^2.8.0",
+		"prettier-plugin-svelte": "^2.10.1",
+		"svelte": "^4.2.7",
+		"svelte-check": "^3.6.0",
+		"tslib": "^2.4.1",
+		"tsx": "^4.16.0",
+		"typescript": "^5.0.0",
+		"vite": "^5.0.3",
+		"vitest": "^1.0.4"
+	},
+	"dependencies": {
+		"@fastify/cors": "^8.4.0",
+		"aws-lambda-fastify": "^2.2.0",
+		"fastify": "^4.0.0",
+		"openai": "^4.59.0"
+	},
+	"type": "module"
+}
