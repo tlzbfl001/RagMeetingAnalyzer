@@ -1,1 +1,248 @@
-[]
+[
+  {
+    "id": "18de30e1-b6d3-41c1-a644-7e9d90752356",
+    "date": "2025-09-07T15:05:49.911Z",
+    "files": [
+      {
+        "name": "1756804778549-461309970.txt",
+        "size": 794,
+        "type": "text/plain",
+        "serverFilename": "1757257549909-300592833.txt"
+      }
+    ],
+    "extractedTexts": [
+      "회의 일시: 2024년 8월 31일 오후 2시\n참석자: 홍부장, 김과장, 박대리, 이사원, 정사원\n안건: 팀 성과 평가 및 개선 방안\n\n홍부장: 8월 팀 성과를 점검하고 개선 방안을 논의하겠습니다.\n김과장: 매출 목표 대비 95% 달성했습니다. 고객 만족도는 4.2/5.0입니다.\n박대리: 고객 문의 응답 시간이 평균 2시간으로 목표 1시간을 초과했습니다.\n이사원: 업무 프로세스 개선안을 제안합니다. 자동화 도구 도입이 필요합니다.\n정사원: 팀원 교육 프로그램도 계획했습니다. 월 1회 전문가 초청 강연 예정입니다.\n\n결론: 응답 시간 개선을 위한 자동화 시스템 도입, 교육 프로그램 9월부터 시작\n다음 회의: 9월 7일 오전 10시\n"
+    ],
+    "analysisResults": {
+      "summary": "기본 분석: 86단어, 11명의 참석자가 확인되었습니다.",
+      "speakers": [
+        {
+          "name": "홍부장",
+          "count": 2,
+          "percentage": 13
+        },
+        {
+          "name": "김과장",
+          "count": 2,
+          "percentage": 13
+        },
+        {
+          "name": "박대리",
+          "count": 2,
+          "percentage": 13
+        },
+        {
+          "name": "이사원",
+          "count": 2,
+          "percentage": 13
+        },
+        {
+          "name": "정사원",
+          "count": 2,
+          "percentage": 13
+        },
+        {
+          "name": "일시",
+          "count": 1,
+          "percentage": 6
+        },
+        {
+          "name": "참석자",
+          "count": 1,
+          "percentage": 6
+        },
+        {
+          "name": "안건",
+          "count": 1,
+          "percentage": 6
+        },
+        {
+          "name": "결론",
+          "count": 1,
+          "percentage": 6
+        },
+        {
+          "name": "만족도는",
+          "count": 1,
+          "percentage": 6
+        },
+        {
+          "name": "문의",
+          "count": 1,
+          "percentage": 6
+        }
+      ],
+      "keywords": [
+        {
+          "word": "회의",
+          "count": 2,
+          "weight": 20
+        },
+        {
+          "word": "고객",
+          "count": 2,
+          "weight": 20
+        },
+        {
+          "word": "교육",
+          "count": 2,
+          "weight": 20
+        },
+        {
+          "word": "성과",
+          "count": 2,
+          "weight": 20
+        },
+        {
+          "word": "목표",
+          "count": 2,
+          "weight": 20
+        },
+        {
+          "word": "자동화",
+          "count": 2,
+          "weight": 20
+        },
+        {
+          "word": "계획",
+          "count": 1,
+          "weight": 10
+        },
+        {
+          "word": "매출",
+          "count": 1,
+          "weight": 10
+        }
+      ],
+      "sentiment": {
+        "positive": 30,
+        "negative": 15,
+        "neutral": 55
+      },
+      "keyPoints": [
+        "총 86단어 추출",
+        "11명의 참석자 확인",
+        "기본 키워드 분석 완료",
+        "기본 감성 분석 완료"
+      ]
+    }
+  },
+  {
+    "id": "52db185f-c543-49ee-9cba-5041f5dc0c30",
+    "date": "2025-09-07T14:47:29.988Z",
+    "files": [
+      {
+        "name": "1756804778550-682026119.txt",
+        "size": 807,
+        "type": "text/plain",
+        "serverFilename": "1757256449988-173393761.txt"
+      }
+    ],
+    "extractedTexts": [
+      "회의 일시: 2024년 8월 30일 오전 9시\n참석자: 조이사, 김부장, 박과장, 이대리, 한사원\n안건: 연말 사업계획 수립\n\n조이사: 연말 사업계획을 수립하고 내년도 예산을 확정하겠습니다.\n김부장: 올해 실적을 보면 매출 120억원, 영업이익 15억원으로 목표 달성했습니다.\n박과장: 내년도 매출 목표는 150억원, 영업이익 20억원으로 계획합니다.\n이대리: 신규 사업 진출도 검토 중입니다. AI 솔루션 분야 진출이 유망합니다.\n한사원: 인력 채용 계획도 수립했습니다. 개발자 5명, 영업직 3명 추가 채용 예정입니다.\n\n결론: 내년도 매출 150억원 목표 확정, AI 사업 진출 검토 계속, 인력 채용 계획 승인\n다음 회의: 9월 6일 오후 3시\n"
+    ],
+    "analysisResults": {
+      "summary": "기본 분석: 87단어, 9명의 참석자가 확인되었습니다.",
+      "speakers": [
+        {
+          "name": "조이사",
+          "count": 2,
+          "percentage": 14
+        },
+        {
+          "name": "김부장",
+          "count": 2,
+          "percentage": 14
+        },
+        {
+          "name": "박과장",
+          "count": 2,
+          "percentage": 14
+        },
+        {
+          "name": "이대리",
+          "count": 2,
+          "percentage": 14
+        },
+        {
+          "name": "한사원",
+          "count": 2,
+          "percentage": 14
+        },
+        {
+          "name": "일시",
+          "count": 1,
+          "percentage": 7
+        },
+        {
+          "name": "참석자",
+          "count": 1,
+          "percentage": 7
+        },
+        {
+          "name": "안건",
+          "count": 1,
+          "percentage": 7
+        },
+        {
+          "name": "결론",
+          "count": 1,
+          "percentage": 7
+        }
+      ],
+      "keywords": [
+        {
+          "word": "계획",
+          "count": 5,
+          "weight": 50
+        },
+        {
+          "word": "매출",
+          "count": 3,
+          "weight": 30
+        },
+        {
+          "word": "채용",
+          "count": 3,
+          "weight": 30
+        },
+        {
+          "word": "목표",
+          "count": 3,
+          "weight": 30
+        },
+        {
+          "word": "회의",
+          "count": 2,
+          "weight": 20
+        },
+        {
+          "word": "AI",
+          "count": 2,
+          "weight": 20
+        },
+        {
+          "word": "개발",
+          "count": 1,
+          "weight": 10
+        },
+        {
+          "word": "예산",
+          "count": 1,
+          "weight": 10
+        }
+      ],
+      "sentiment": {
+        "positive": 30,
+        "negative": 15,
+        "neutral": 55
+      },
+      "keyPoints": [
+        "총 87단어 추출",
+        "9명의 참석자 확인",
+        "기본 키워드 분석 완료",
+        "기본 감성 분석 완료"
+      ]
+    }
+  }
+]

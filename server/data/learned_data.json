@@ -1,12 +1,74 @@
 {
-  "totalMeetings": 0,
-  "commonKeywords": [],
+  "totalMeetings": 2,
+  "commonKeywords": [
+    {
+      "word": "계획",
+      "count": 6
+    },
+    {
+      "word": "목표",
+      "count": 5
+    },
+    {
+      "word": "회의",
+      "count": 4
+    },
+    {
+      "word": "매출",
+      "count": 4
+    },
+    {
+      "word": "채용",
+      "count": 3
+    },
+    {
+      "word": "고객",
+      "count": 2
+    },
+    {
+      "word": "교육",
+      "count": 2
+    },
+    {
+      "word": "성과",
+      "count": 2
+    },
+    {
+      "word": "자동화",
+      "count": 2
+    },
+    {
+      "word": "AI",
+      "count": 2
+    },
+    {
+      "word": "개발",
+      "count": 1
+    },
+    {
+      "word": "예산",
+      "count": 1
+    }
+  ],
   "speakerPatterns": [],
-  "sentimentTrends": [],
+  "sentimentTrends": [
+    {
+      "date": "2025-09-07T15:05:49.911Z",
+      "positive": 30,
+      "negative": 15,
+      "neutral": 55
+    },
+    {
+      "date": "2025-09-07T14:47:29.988Z",
+      "positive": 30,
+      "negative": 15,
+      "neutral": 55
+    }
+  ],
   "futurePredictions": [
     "향후 회의는 부정적 분위기로 진행될 것으로 예측됩니다.",
     "화자별 발언 패턴 분석 결과, 중간관리자 역할의 참석자가 0% 비중으로 주도적인 역할을 할 것으로 예상됩니다.",
-    "주요 키워드 \"회의\"는 향후 회의에서도 핵심 주제로 다뤄질 가능성이 높습니다.",
+    "주요 키워드 \"계획\"는 향후 회의에서도 핵심 주제로 다뤄질 가능성이 높습니다.",
     "감성 분석 트렌드를 보면, 회의 분위기가 개선이 필요한 추세를 보이고 있어, 향후 건설적인 방향으로 개선될 것으로 예측됩니다."
   ]
 }

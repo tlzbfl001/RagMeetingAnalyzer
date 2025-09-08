@@ -1,414 +1,244 @@
 <script lang="ts">
-	import { onMount } from 'svelte';
-	import { generateCommonMeetingReport } from '$lib/meetingReport.js';
-	
-	// 분석 히스토리 데이터
-	let analysisHistory: any[] = [];
-	
-	let isLoading = false;
-	let selectedHistory: any = null;
+  import { onMount } from 'svelte';
+  import { generateCommonMeetingReport } from '$lib/meetingReport.js';
 
-	onMount(async () => {
-		await loadHistoryData();
-	});
-	// 히스토리 데이터 로드
-	async function loadHistoryData() {
-		isLoading = true;
-		try {
-			// 서버에서 히스토리 데이터 가져오기
-			const response = await fetchWithTimeout('/api/history');
-			if (response.ok) {
-				const result = await response.json();
-				analysisHistory = result.data || [];
-				console.log('서버에서 히스토리 로드:', analysisHistory);
-			} else {
-				console.error('히스토리 로드 실패:', response.status);
-				// 서버 실패 시 로컬 스토리지에서 로드
-				const savedHistory = localStorage.getItem('analysisHistory');
-				if (savedHistory) {
-					analysisHistory = JSON.parse(savedHistory);
-					console.log('로컬에서 히스토리 로드:', analysisHistory);
-				}
-			}
-		} catch (error) {
-			console.error('히스토리 로드 중 오류:', error);
-			// AbortError 포함: 초기 렌더를 막지 않음, 로컬 fallback
-			const savedHistory = localStorage.getItem('analysisHistory');
-			if (savedHistory) {
-				analysisHistory = JSON.parse(savedHistory);
-				console.log('로컬에서 히스토리 로드:', analysisHistory);
-			}
-		} finally {
-			// 로딩 완료
-			isLoading = false;
-		}
-	}
-	
-	// 히스토리 상세 보기
-	function viewHistoryDetails(history: any) {
-		const hydrated = {
-			...history,
-			analysisResults: history.analysisResults ?? {
-				summary: history.summary ?? '요약 없음',
-				speakers: history.speakers ?? [],
-				keywords: history.keywords ?? [],
-				sentiment: history.sentiment ?? { positive: 0, negative: 0, neutral: 100 },
-				keyPoints: history.keyPoints ?? []
-			}
-		};
-		console.log('상세보기 클릭:', hydrated);
-		selectedHistory = hydrated;
+  // === 통합 유틸 ===
+  function fetchWithTimeout(resource: string, options: RequestInit = {}, timeoutMs = 4000) {
+    const controller = new AbortController();
+    const id = setTimeout(() => controller.abort(), timeoutMs);
+    return fetch(resource, { ...options, signal: controller.signal }).finally(() => clearTimeout(id));
+  }
 
-		// 미래 예측 주입 (메인과 동일 기준)
-		try {
-			const preds = generatePredictionsForHistory(hydrated, analysisHistory || []);
-			if (Array.isArray(preds)) {
-				hydrated.analysisResults.futurePredictions = preds;
-			}
-		} catch {}
-	}
+  function getSentiment(item: any) {
+    const s = (item?.analysisResults?.sentiment) || item?.sentiment;
+    return {
+      positive: Number(s?.positive || 0),
+      negative: Number(s?.negative || 0),
+      neutral: Number(s?.neutral || 0)
+    };
+  }
 
-	function getSentiment(item: any) {
-		const s = (item?.analysisResults?.sentiment) || item?.sentiment;
-		return {
-			positive: Number(s?.positive || 0),
-			negative: Number(s?.negative || 0),
-			neutral: Number(s?.neutral || 0)
-		};
-	}
-	
-	// 히스토리 닫기
-	function closeHistoryDetails() {
-		selectedHistory = null;
-	}
-	
-	// 히스토리 삭제
-	async function deleteHistory(id: string) {
-		if (confirm('정말 삭제하시겠습니까?')) {
-			try {
-				// 서버에서 분석 결과 및 파일 삭제
-				let deleteResponse: Response;
-				try {
-					deleteResponse = await fetchWithTimeout(`/api/analysis/${id}`, {
-						method: 'DELETE'
-					}, 15000);
-				} catch (e) {
-					// Abort 등 타임아웃 시 한번 더 시도 (무타임아웃)
-					console.warn('삭제 타임아웃, 재시도 중(무타임아웃)...');
-					deleteResponse = await fetch(`/api/analysis/${id}`, { method: 'DELETE' });
-				}
-				
-				if (deleteResponse.ok) {
-					console.log('서버에서 분석 결과 및 파일 삭제 성공');
-					// 프론트엔드에서도 제거
-					analysisHistory = analysisHistory.filter(h => h.id !== id);
-					localStorage.setItem('analysisHistory', JSON.stringify(analysisHistory));
-					await loadHistoryData();
-					alert('분석 결과가 성공적으로 삭제되었습니다.');
-				} else if (deleteResponse.status === 404) {
-					try {
-						const resp = await fetchWithTimeout('/api/history');
-						if (resp.ok) {
-						const { data } = await resp.json();
-						const target = analysisHistory.find(h => h.id === id);
-						if (target) {
-							const names = new Set((target.files || []).map((f: any) => f.name));
-							const candidate = (data || []).find((h: any) => {
-							const files = h.files || [];
-							if (files.length !== names.size) return false;
-							return files.every((f: any) => names.has(f.name));
-							}) || null;
+  function generatePredictionsForHistory(current: any, historyList: any[]): string[] {
+    try {
+      const predictions: string[] = [];
+      const ar = current?.analysisResults || current || {};
+      let totalPositive = Number(ar?.sentiment?.positive || 0);
+      let totalNegative = Number(ar?.sentiment?.negative || 0);
+      let totalNeutral = Number(ar?.sentiment?.neutral || 0);
+      let count = 1;
+      for (const h of historyList) {
+        const s = (h?.analysisResults?.sentiment) || h?.sentiment;
+        if (s) {
+          totalPositive += Number(s.positive || 0);
+          totalNegative += Number(s.negative || 0);
+          totalNeutral += Number(s.neutral || 0);
+          count++;
+        }
+      }
+      const avgPositive = totalPositive / count;
+      predictions.push(`향후 회의는 ${avgPositive > 60 ? '긍정적' : avgPositive > 40 ? '중립적' : '부정적'} 분위기로 진행될 것으로 예측됩니다.`);
+      const roleHint = avgPositive > 60 ? '최고경영진' : avgPositive > 40 ? '고급관리자' : '중간관리자';
+      predictions.push(`화자별 발언 패턴 분석 결과, ${roleHint} 역할의 참석자가 주도적인 역할을 할 것으로 예상됩니다.`);
+      const allKeywords: Array<{ word: string; count: number }> = [];
+      const curKeywords = Array.isArray(ar?.keywords) ? ar.keywords : [];
+      for (const k of curKeywords) {
+        const word = typeof k === 'string' ? k : (k?.word || '');
+        const count = typeof k === 'string' ? 1 : Number(k?.count || 1);
+        if (word) allKeywords.push({ word, count });
+      }
+      for (const h of historyList) {
+        const ks = (h?.analysisResults?.keywords) || h?.keywords || [];
+        for (const k of ks) {
+          const word = typeof k === 'string' ? k : (k?.word || '');
+          const count = typeof k === 'string' ? 1 : Number(k?.count || 1);
+          if (word) allKeywords.push({ word, count });
+        }
+      }
+      const freq: Record<string, number> = {};
+      for (const k of allKeywords) freq[k.word] = (freq[k.word] || 0) + k.count;
+      const top = Object.entries(freq).sort((a,b)=>b[1]-a[1])[0]?.[0] || '회의';
+      predictions.push(`주요 키워드 "${top}"는 향후 회의에서도 핵심 주제로 다뤄질 가능성이 높습니다.`);
+      const overall = avgPositive > 50 ? '긍정적' : avgPositive > 30 ? '안정적' : '개선 필요';
+      predictions.push(`전반적으로 ${overall}인 분위기로 진행되고 있습니다. 지속적인 모니터링과 개선을 통해 더욱 효과적인 회의 문화를 만들어갈 것으로 예측됩니다.`);
+      return predictions.slice(0, 8);
+    } catch {
+      return [];
+    }
+  }
 
-							if (candidate?.id) {
-							const del2 = await fetch(`/api/analysis/${candidate.id}`, { method: 'DELETE' });
-							if (del2.ok) {
-								analysisHistory = analysisHistory.filter(h => h.id !== candidate.id && h.id !== id);
-								localStorage.setItem('analysisHistory', JSON.stringify(analysisHistory));
-								await loadHistoryData();
-								alert('분석 결과가 성공적으로 삭제되었습니다.');
-							} else {
-								alert('삭제에 실패했습니다. 다시 시도해주세요.');
-							}
-							} else {
-							analysisHistory = analysisHistory.filter(h => h.id !== id);
-							localStorage.setItem('analysisHistory', JSON.stringify(analysisHistory));
-							await loadHistoryData();
-							alert('해당 항목이 이미 삭제되어 목록에서 제거했습니다.');
-							}
-						} else {
-							alert('서버 동기화 실패. 잠시 후 다시 시도해주세요.');
-						}
-						}
-					} catch {
-						alert('삭제 처리 중 오류가 발생했습니다.');
-					}
-				}
-			}catch{
-				alert('삭제 처리 중 오류가 발생했습니다.');
-			}
-		}
-	}
-	
-	// 모든 히스토리 삭제
-	async function clearAllHistory() {
-		if (confirm('모든 분석 히스토리를 삭제하시겠습니까?')) {
-			try {
-				// 서버의 모든 분석 결과 삭제 (파일도 함께 삭제)
-				console.log('서버에서 전체 분석 결과 및 파일 삭제 중...');
-				let clearAllResponse: Response;
-				try {
-					clearAllResponse = await fetchWithTimeout('/api/analysis', {
-						method: 'DELETE'
-					}, 15000);
-				} catch (e) {
-					console.warn('전체 삭제 타임아웃, 재시도 중(무타임아웃)...');
-					clearAllResponse = await fetch('/api/analysis', { method: 'DELETE' });
-				}
-				
-				if (clearAllResponse.ok) {
-					console.log('서버 전체 삭제 성공');
-					
-					// 프론트엔드 데이터 초기화
-					analysisHistory = [];
-					localStorage.removeItem('analysisHistory');
-					
-					alert('모든 히스토리가 성공적으로 삭제되었습니다.');
-				} else {
-					console.error('서버 전체 삭제 실패:', clearAllResponse.status);
-					alert('서버에서 삭제에 실패했습니다. 다시 시도해주세요.');
-				}
-			} catch (error) {
-				console.error('데이터 삭제 중 오류:', error);
-				const errorMessage = error instanceof Error ? error.message : '알 수 없는 오류';
-				alert('데이터 삭제 중 오류가 발생했습니다: ' + errorMessage);
-			}
-		}
-	}
-	
-	// 메인 페이지로 이동
-	function goToMain() {
-		window.location.href = '/';
-	}
+  function generateFileContent(fileName: string, fileType: string): string {
+    const baseContent = `이 파일은 ${fileName}입니다.\n\n파일 형식: ${fileType}\n생성일시: ${new Date().toLocaleString('ko-KR')}\n\n`;
+    switch (fileType) {
+      case 'text/plain':
+      case 'application/txt':
+        return baseContent + '회의 내용:\n- 프로젝트 진행 상황 논의\n- 향후 계획 수립\n- 팀원 간 협업 방안\n- 예산 및 일정 조정';
+      case 'audio/mpeg':
+      case 'audio/wav':
+        return baseContent + '음성 파일 내용:\n- 회의 녹음 파일\n- 화자별 발언 내용\n- 주요 논의 사항';
+      case 'video/mp4':
+        return baseContent + '영상 파일 내용:\n- 회의 영상 녹화\n- 화면 공유 내용\n- 참석자들의 표정과 제스처';
+      case 'application/msword':
+      case 'application/vnd.openxmlformats-officedocument.wordprocessingml.document':
+        return baseContent + 'Word 문서 내용:\n- 회의록 초안\n- 프로젝트 보고서\n- 회의 안건';
+      default:
+        return baseContent + '파일 내용을 확인할 수 없습니다.';
+    }
+  }
 
-	// 회의록 다운로드
-	function downloadMeetingReport(history: any) {
-		const reportContent = generateMeetingReport(history);
-		const blob = new Blob([reportContent], { type: 'text/html;charset=utf-8' });
-		const url = URL.createObjectURL(blob);
-		const a = document.createElement('a');
-		a.href = url;
-		a.download = `회의록_${history.date.replace(/[^0-9]/g, '')}.html`;
-		document.body.appendChild(a);
-		a.click();
-		document.body.removeChild(a);
-		URL.revokeObjectURL(url);
-	}
+  function generateMeetingReport(history: any) {
+    const now = new Date();
+    const currentDate = `${now.getFullYear()}년 ${now.getMonth() + 1}월 ${now.getDate()}일`;
+    let extractedText = '';
+    if (history.extractedTexts && Array.isArray(history.extractedTexts) && history.extractedTexts.length > 0) {
+      extractedText = history.extractedTexts[0];
+    } else if (history.extractedTexts && typeof history.extractedTexts === 'string') {
+      extractedText = history.extractedTexts;
+    } else if (history.extractedText) {
+      extractedText = history.extractedText;
+    }
+    const analysisResultsWithText = { ...history.analysisResults, extractedText };
+    return generateCommonMeetingReport(analysisResultsWithText, currentDate);
+  }
+  let analysisHistory: any[] = [];
+  let isLoading = false;
+  let selectedHistory: any = null;
 
-	// 원본 파일들 다운로드
-	async function downloadOriginalFiles(history: any) {
-		try {
-			console.log('다운로드 시작:', history.files);
-			
-			// 각 파일을 개별적으로 다운로드
-			for (const file of history.files) {
-				console.log('파일 처리 중:', file);
-				
-				let fileBlob: Blob;
-				let fileName = file.name;
-				
-				if (file.downloadUrl && file.downloadUrl.startsWith('http')) {
-					// 서버에 저장된 파일인 경우
-					console.log('서버에서 다운로드:', file.downloadUrl);
-					try {
-						const response = await fetch(file.downloadUrl);
-						if (response.ok) {
-							fileBlob = await response.blob();
-						} else {
-							throw new Error(`HTTP ${response.status}`);
-						}
-					} catch (fetchError) {
-						console.error('서버 다운로드 실패, 로컬 생성으로 대체:', fetchError);
-						// 서버 다운로드 실패 시 로컬 생성으로 대체
-						const fileContent = generateFileContent(file.name, file.type);
-						fileBlob = new Blob([fileContent], { 
-							type: file.type || 'text/plain' 
-						});
-					}
-				} else {
-					// 기존 히스토리 또는 서버 URL이 없는 경우
-					console.log('로컬에서 파일 생성:', file.name);
-					const fileContent = generateFileContent(file.name, file.type);
-					fileBlob = new Blob([fileContent], { 
-						type: file.type || 'text/plain' 
-					});
-				}
-				
-				// 파일 다운로드 실행
-				const url = URL.createObjectURL(fileBlob);
-				const a = document.createElement('a');
-				a.href = url;
-				a.download = fileName;
-				a.style.display = 'none';
-				document.body.appendChild(a);
-				a.click();
-				document.body.removeChild(a);
-				URL.revokeObjectURL(url);
-				
-				console.log('파일 다운로드 완료:', fileName);
-				
-				// 파일 간 약간의 지연
-				await new Promise(resolve => setTimeout(resolve, 200));
-			}
-			
-			alert('모든 파일 다운로드가 완료되었습니다!');
-		} catch (error) {
-			console.error('파일 다운로드 중 오류:', error);
-			const errorMessage = error instanceof Error ? error.message : '알 수 없는 오류';
-			alert('파일 다운로드 중 오류가 발생했습니다: ' + errorMessage);
-		}
-	}
+  // 페이지 핸들러 통합
 
-	// 파일 내용 생성 (기존 히스토리용)
-	function generateFileContent(fileName: string, fileType: string): string {
-		const baseContent = `이 파일은 ${fileName}입니다.\n\n파일 형식: ${fileType}\n생성일시: ${new Date().toLocaleString('ko-KR')}\n\n`;
-		
-		switch (fileType) {
-			case 'text/plain':
-			case 'application/txt':
-				return baseContent + '회의 내용:\n- 프로젝트 진행 상황 논의\n- 향후 계획 수립\n- 팀원 간 협업 방안\n- 예산 및 일정 조정';
-			case 'audio/mpeg':
-			case 'audio/wav':
-				return baseContent + '음성 파일 내용:\n- 회의 녹음 파일\n- 화자별 발언 내용\n- 주요 논의 사항';
-			case 'video/mp4':
-				return baseContent + '영상 파일 내용:\n- 회의 영상 녹화\n- 화면 공유 내용\n- 참석자들의 표정과 제스처';
-			case 'application/msword':
-			case 'application/vnd.openxmlformats-officedocument.wordprocessingml.document':
-				return baseContent + 'Word 문서 내용:\n- 회의록 초안\n- 프로젝트 보고서\n- 회의 안건';
-			default:
-				return baseContent + '파일 내용을 확인할 수 없습니다.';
-		}
-	}
+  async function loadHistoryData() {
+    isLoading = true;
+    try {
+      const response = await fetchWithTimeout('/api/history');
+      if (response.ok) {
+        const result = await response.json();
+        analysisHistory = result.data || [];
+      } else {
+        const saved = localStorage.getItem('analysisHistory');
+        if (saved) analysisHistory = JSON.parse(saved);
+      }
+    } catch {
+      const saved = localStorage.getItem('analysisHistory');
+      if (saved) analysisHistory = JSON.parse(saved);
+    } finally {
+      isLoading = false;
+    }
+  }
 
-	// 분석된 파일들 다운로드 (JSON)
-	function downloadAnalyzedFiles(history: any) {
-		const filesData = {
-			분석일시: history.date,
-			분석파일수: history.files.length,
-			파일목록: history.files.map((file: any) => ({
-				파일명: file.name,
-				크기: `${(file.size / 1024 / 1024).toFixed(2)} MB`,
-				형식: file.type
-			}))
-		};
-		
-		const blob = new Blob([JSON.stringify(filesData, null, 2)], { type: 'application/json;charset=utf-8' });
-		const url = URL.createObjectURL(blob);
-		const a = document.createElement('a');
-		a.href = url;
-		a.download = `분석된파일들_${history.date.replace(/[^0-9]/g, '')}.json`;
-		document.body.appendChild(a);
-		a.click();
-		document.body.removeChild(a);
-		URL.revokeObjectURL(url);
-	}
+  onMount(loadHistoryData);
 
-	// 회의록 HTML 생성
-	function generateMeetingReport(history: any) {
-		const now = new Date();
-		const currentDate = `${now.getFullYear()}년 ${now.getMonth() + 1}월 ${now.getDate()}일`;
-		
-		// 회의 내용에서 정보 추출
-		let extractedText = '';
-		
-		// history.extractedTexts가 배열이고 첫 번째 요소가 있는지 확인
-		if (history.extractedTexts && Array.isArray(history.extractedTexts) && history.extractedTexts.length > 0) {
-			extractedText = history.extractedTexts[0];
-		} else if (history.extractedTexts && typeof history.extractedTexts === 'string') {
-			// extractedTexts가 문자열인 경우
-			extractedText = history.extractedTexts;
-		} else if (history.extractedText) {
-			// extractedText 필드가 있는 경우
-			extractedText = history.extractedText;
-		}
-		
-		// extractedText 추가하여 공통 회의록 생성 함수 사용
-		const analysisResultsWithText = {
-			...history.analysisResults,
-			extractedText: extractedText
-		};
-		return generateCommonMeetingReport(analysisResultsWithText, currentDate);
-	}
+  function viewHistoryDetails(history: any) {
+    const hydrated = {
+      ...history,
+      analysisResults: history.analysisResults ?? {
+        summary: history.summary ?? '요약 없음',
+        speakers: history.speakers ?? [],
+        keywords: history.keywords ?? [],
+        sentiment: history.sentiment ?? { positive: 0, negative: 0, neutral: 100 },
+        keyPoints: history.keyPoints ?? []
+      }
+    };
+    try {
+      const preds = generatePredictionsForHistory(hydrated, analysisHistory || []);
+      if (Array.isArray(preds)) hydrated.analysisResults.futurePredictions = preds;
+    } catch {}
+    selectedHistory = hydrated;
+  }
 
-	// 메인 페이지와 동일한 로직으로 미래 예측 생성
-	function generatePredictionsForHistory(current: any, historyList: any[]): string[] {
-		try {
-			const predictions: string[] = [];
-			const ar = current?.analysisResults || current || {};
-			const totalMeetings = historyList.length;
+  function closeHistoryDetails() { selectedHistory = null; }
 
-			// 감성 평균 계산
-			let totalPositive = Number(ar?.sentiment?.positive || 0);
-			let totalNegative = Number(ar?.sentiment?.negative || 0);
-			let totalNeutral = Number(ar?.sentiment?.neutral || 0);
-			let count = 1;
-			for (const h of historyList) {
-				const s = (h?.analysisResults?.sentiment) || h?.sentiment;
-				if (s) {
-					totalPositive += Number(s.positive || 0);
-					totalNegative += Number(s.negative || 0);
-					totalNeutral += Number(s.neutral || 0);
-					count++;
-				}
-			}
-			const avgPositive = totalPositive / count;
-			const avgNegative = totalNegative / count;
-			const avgNeutral = totalNeutral / count;
+  async function deleteHistory(id: string) {
+    if (!confirm('정말 삭제하시겠습니까?')) return;
+    try {
+      let res: Response;
+      try { res = await fetchWithTimeout(`/api/analysis/${id}`, { method: 'DELETE' }, 15000); }
+      catch { res = await fetch(`/api/analysis/${id}`, { method: 'DELETE' }); }
+      if (res.ok) {
+        analysisHistory = analysisHistory.filter(h => h.id !== id);
+        localStorage.setItem('analysisHistory', JSON.stringify(analysisHistory));
+        await loadHistoryData();
+        alert('분석 결과가 성공적으로 삭제되었습니다.');
+      } else if (res.status === 404) {
+        const resp = await fetchWithTimeout('/api/history');
+        if (resp.ok) {
+          const { data } = await resp.json();
+          const target = analysisHistory.find(h => h.id === id);
+          if (target) {
+            const names = new Set((target.files || []).map((f: any) => f.name));
+            const cand = (data || []).find((h: any) => {
+              const files = h.files || [];
+              if (files.length !== names.size) return false;
+              return files.every((f: any) => names.has(f.name));
+            });
+            if (cand?.id) await fetch(`/api/analysis/${cand.id}`, { method: 'DELETE' });
+          }
+          analysisHistory = analysisHistory.filter(h => h.id !== id);
+          localStorage.setItem('analysisHistory', JSON.stringify(analysisHistory));
+          await loadHistoryData();
+          alert('분석 결과가 성공적으로 삭제되었습니다.');
+        }
+      }
+    } catch {
+      alert('삭제 처리 중 오류가 발생했습니다.');
+    }
+  }
 
-			// 1) 분위기 예측
-			predictions.push(`향후 회의는 ${avgPositive > 60 ? '긍정적' : avgPositive > 40 ? '중립적' : '부정적'} 분위기로 진행될 것으로 예측됩니다.`);
+  async function clearAllHistory() {
+    if (!confirm('모든 분석 히스토리를 삭제하시겠습니까?')) return;
+    try {
+      let res: Response;
+      try { res = await fetchWithTimeout('/api/analysis', { method: 'DELETE' }, 15000); }
+      catch { res = await fetch('/api/analysis', { method: 'DELETE' }); }
+      if (res.ok) {
+        analysisHistory = [];
+        localStorage.removeItem('analysisHistory');
+        alert('모든 히스토리가 성공적으로 삭제되었습니다.');
+      } else {
+        alert('서버에서 삭제에 실패했습니다. 다시 시도해주세요.');
+      }
+    } catch {
+      alert('데이터 삭제 중 오류가 발생했습니다.');
+    }
+  }
 
-			// 2) 화자 패턴(간단 추정)
-			const roleHint = avgPositive > 60 ? '최고경영진' : avgPositive > 40 ? '고급관리자' : '중간관리자';
-			predictions.push(`화자별 발언 패턴 분석 결과, ${roleHint} 역할의 참석자가 주도적인 역할을 할 것으로 예상됩니다.`);
+  function goToMain() { window.location.href = '/'; }
 
-			// 3) 키워드 예측
-			const allKeywords: Array<{ word: string; count: number }> = [];
-			const curKeywords = Array.isArray(ar?.keywords) ? ar.keywords : [];
-			for (const k of curKeywords) {
-				const word = typeof k === 'string' ? k : (k?.word || '');
-				const count = typeof k === 'string' ? 1 : Number(k?.count || 1);
-				if (word) allKeywords.push({ word, count });
-			}
-			for (const h of historyList) {
-				const ks = (h?.analysisResults?.keywords) || h?.keywords || [];
-				for (const k of ks) {
-					const word = typeof k === 'string' ? k : (k?.word || '');
-					const count = typeof k === 'string' ? 1 : Number(k?.count || 1);
-					if (word) allKeywords.push({ word, count });
-				}
-			}
-			const freq: Record<string, number> = {};
-			for (const k of allKeywords) freq[k.word] = (freq[k.word] || 0) + k.count;
-			const top = Object.entries(freq).sort((a,b)=>b[1]-a[1])[0]?.[0] || '회의';
-			predictions.push(`주요 키워드 "${top}"는 향후 회의에서도 핵심 주제로 다뤄질 가능성이 높습니다.`);
+  async function downloadOriginalFiles(history: any) {
+    for (const file of history.files) {
+      let fileBlob: Blob; let fileName = file.name;
+      if (file.downloadUrl && file.downloadUrl.startsWith('http')) {
+        try { const response = await fetch(file.downloadUrl); if (!response.ok) throw new Error('http'); fileBlob = await response.blob(); }
+        catch { const content = generateFileContent(file.name, file.type); fileBlob = new Blob([content], { type: file.type || 'text/plain' }); }
+      } else {
+        const content = generateFileContent(file.name, file.type);
+        fileBlob = new Blob([content], { type: file.type || 'text/plain' });
+      }
+      const url = URL.createObjectURL(fileBlob);
+      const a = document.createElement('a'); a.href = url; a.download = fileName; a.style.display = 'none';
+      document.body.appendChild(a); a.click(); document.body.removeChild(a); URL.revokeObjectURL(url);
+      await new Promise(r => setTimeout(r, 200));
+    }
+    alert('모든 파일 다운로드가 완료되었습니다!');
+  }
 
-			// 4) 종합 전망
-			const overall = avgPositive > 50 ? '긍정적' : avgPositive > 30 ? '안정적' : '개선 필요';
-			predictions.push(`전반적으로 ${overall}인 분위기로 진행되고 있습니다. 지속적인 모니터링과 개선을 통해 더욱 효과적인 회의 문화를 만들어갈 것으로 예측됩니다.`);
+  function downloadAnalyzedFiles(history: any) {
+    const filesData = {
+      분s석일시: history.date,
+      분석파일수: history.files.length,
+      파일목록: history.files.map((file: any) => ({ 파일명: file.name, 크기: `${(file.size / 1024 / 1024).toFixed(2)} MB`, 형식: file.type }))
+    };
+    const blob = new Blob([JSON.stringify(filesData, null, 2)], { type: 'application/json;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a'); a.href = url; a.download = `분석된파일들_${history.date.replace(/[^0-9]/g, '')}.json`;
+    document.body.appendChild(a); a.click(); document.body.removeChild(a); URL.revokeObjectURL(url);
+  }
 
-			return predictions.slice(0, 8);
-		} catch {
-			return [];
-		}
-	}
-
-	// 지정한 시간(ms) 안에 응답이 없으면 Abort하는 유틸
-	function fetchWithTimeout(resource: string, options: RequestInit = {}, timeoutMs = 4000) {
-		const controller = new AbortController();
-		const id = setTimeout(() => controller.abort(), timeoutMs);
-		return fetch(resource, { ...options, signal: controller.signal })
-			.finally(() => clearTimeout(id));
-	}
+  function downloadMeetingReport(history: any) {
+    const reportContent = generateMeetingReport(history);
+    const blob = new Blob([reportContent], { type: 'text/html;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a'); a.href = url; a.download = `회의록_${history.date.replace(/[^0-9]/g, '')}.html`;
+    document.body.appendChild(a); a.click(); document.body.removeChild(a); URL.revokeObjectURL(url);
+  }
 </script>
 
 <!-- 헤더 배너 -->
@@ -1152,8 +982,6 @@
 		background: #10b981;
 		color: white;
 	}
-
-
 
 	.download-btn:hover {
 		transform: translateY(-2px);
