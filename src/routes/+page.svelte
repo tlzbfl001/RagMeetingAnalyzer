@@ -258,13 +258,14 @@
 		return /[가-힣]{2,}/.test(before);
 	}
 
-	// 차트 표시용 화자 목록: ROLE 필터 통과자가 없으면 느슨한 기준으로 대체
+	// 차트 표시용 화자 목록: 직함이 있는 화자만 표시
 	function getSpeakersForChart(ar: AnalysisResult) {
 		const strict = (ar?.speakers || []).filter(s => isValidRoleName(s.name));
 		if (strict.length > 0) return strict;
 		const looseRole = (ar?.speakers || []).filter(s => /(대표|부장|사장|이사장|이사|상무|전무|본부장|센터장|그룹장|실장|팀장|과장|차장|대리|주임|수석|책임|선임|연구원|매니저|디렉터|VP)/.test(String(s.name)));
 		if (looseRole.length > 0) return looseRole;
-		return (ar?.speakers || []).filter(s => /^[가-힣]{2,4}$/.test(String(s.name)));
+		// 직함이 없는 화자는 표시하지 않음
+		return [];
 	}
 
 	// 데이터 기반 미래 예측 생성 함수

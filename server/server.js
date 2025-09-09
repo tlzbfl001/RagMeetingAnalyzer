@@ -647,10 +647,11 @@ app.post('/api/analyze', upload.array('files', 10), async (req, res) => {
         } else if (file.mimetype.startsWith('audio/') || file.mimetype.startsWith('video/')) {
           // 음성/영상 파일
           if (FAST_MEDIA_MODE) {
-            // 빠른 응답 모드: 전사는 백그라운드에서 수행
+            // 빠른 응답 모드: 전사는 백그라운드에서 수행하지만 즉시 분석도 진행
             console.log(`FAST_MEDIA_MODE: 전사 백그라운드 처리 예정 → ${originalName}`);
             mediaPaths.push({path: file.path, name: originalName});
-            // 즉시 분석용 텍스트에는 포함하지 않음(플레이스홀더로 응답)
+            // 즉시 분석을 위해 플레이스홀더 텍스트 추가
+            extractedTexts.push(`[음성/영상 파일: ${originalName} - 전사 진행 중]`);
             continue;
           }
           // 동기 처리 모드: Whisper로 즉시 전사

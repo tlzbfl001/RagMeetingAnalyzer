@@ -10,6 +10,31 @@
     return fetch(resource, { ...options, signal: controller.signal }).finally(() => clearTimeout(id));
   }
 
+  // 화자명 유효성 검사: 직함(ROLE_TITLES)로 끝나고, 직함 앞 한글 1자 이상
+  function isValidRoleName(name: string): boolean {
+    if (!name) return false;
+    const ROLE_TITLES = [
+      '대표','부장','사장','부사장','전무','상무','이사','이사장','회장','사장대행','고문','자문',
+      '본부장','센터장','그룹장','실장','팀장','파트장','지점장','소장','과장','차장','대리','주임','사원',
+      '수석','책임','선임','전임','연구원','주임연구원','선임연구원','책임연구원','수석연구원',
+      '박사','석사','학사','전문위원','전문가','컨설턴트','PM','PO','PL','QA','QC',
+      '개발자','엔지니어','디자이너','기획자','분석가','데이터사이언티스트','데이터엔지니어','ML엔지니어','리서처',
+      '마케터','세일즈','영업','CS','고객지원','운영','매니저','코치','트레이너','강사','교수','교사',
+      '회계사','변호사','변리사','세무사','노무사','감사','내부감사','재무담당','인사담당','총무담당','법무담당',
+      'PR담당','IR담당','브랜드매니저','프로덕트오너','프로덕트매니저','프로젝트매니저','UX리서처','UX디자이너','UI디자이너',
+      '백엔드','프론트엔드','풀스택','클라우드아키텍트','아키텍트','SRE','보안담당','CISO','CFO','CTO','COO','CEO',
+      '대표이사','총괄','책임자','실무자','담당자','주관','주최','발표자','발언자','사회자','진행자',
+      '인턴','수습','신입','주니어','시니어','리드','헤드','디렉터','VP'
+    ];
+    const nameStr = String(name).trim();
+    const roleRegex = new RegExp(`(${ROLE_TITLES.join('|')})$`);
+    const m = nameStr.match(roleRegex);
+    if (!m) return false;
+    const role = m[1];
+    const before = nameStr.slice(0, nameStr.length - role.length).trim();
+    return /[가-힣]{1,}/.test(before);
+  }
+
   function getSentiment(item: any) {
     const s = (item?.analysisResults?.sentiment) || item?.sentiment;
     return {
@@ -342,7 +367,7 @@
 						<div class="result-card speaker-card">
 							<h4>👥 화자별 발언 비중</h4>
 							<div class="speaker-chart">
-								{#each (selectedHistory.analysisResults?.speakers || selectedHistory.speakers || []) as speaker}
+								{#each (selectedHistory.analysisResults?.speakers || selectedHistory.speakers || []).filter(s => isValidRoleName(s.name)) as speaker}
 									<div class="speaker-item">
 										<span class="speaker-name">{speaker.name}</span>
 										<div class="speaker-bar">
