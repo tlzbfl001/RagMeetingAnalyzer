@@ -1,5 +1,6 @@
 <script lang="ts">
   import { onMount } from 'svelte';
+  import { base } from '$app/paths';
   import { generateCommonMeetingReport } from '$lib/meetingReport.js';
 
   // === 통합 유틸 ===
@@ -104,7 +105,6 @@
   let selectedHistory: any = null;
 
   // 페이지 핸들러 통합
-
   async function loadHistoryData() {
     isLoading = true;
     try {
@@ -200,8 +200,6 @@
     }
   }
 
-  function goToMain() { window.location.href = '/'; }
-
   async function downloadOriginalFiles(history: any) {
     for (const file of history.files) {
       let fileBlob: Blob; let fileName = file.name;
@@ -222,7 +220,7 @@
 
   function downloadAnalyzedFiles(history: any) {
     const filesData = {
-      분s석일시: history.date,
+      분석일시: history.date,
       분석파일수: history.files.length,
       파일목록: history.files.map((file: any) => ({ 파일명: file.name, 크기: `${(file.size / 1024 / 1024).toFixed(2)} MB`, 형식: file.type }))
     };
@@ -256,8 +254,8 @@
 		
 		<!-- 네비게이션 메뉴 -->
 		<nav class="header-nav">
-			<a href="/" class="nav-link" data-sveltekit-preload-data="off" data-sveltekit-preload-code="off" on:click|preventDefault={goToMain}>🏠 메인</a>
-			<a href="/history" class="nav-link active" data-sveltekit-preload-data="off" data-sveltekit-preload-code="off">📊 히스토리</a>
+			<a href="{base}/" class="nav-link" data-sveltekit-preload-data="off" data-sveltekit-preload-code="off">🏠 메인</a>
+			<a href="{base}/history" class="nav-link active" data-sveltekit-preload-data="off" data-sveltekit-preload-code="off">📊 히스토리</a>
 		</nav>
 	</div>
 </header>

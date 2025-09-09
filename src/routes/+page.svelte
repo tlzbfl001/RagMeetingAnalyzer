@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { generateCommonMeetingReport } from '$lib/meetingReport.js';
+	import { base } from '$app/paths';
 	
 	interface FileInfo {
 		id: string;
@@ -305,7 +306,6 @@
 		
 		// 2. 키워드 트렌드 기반 예측
 		const currentKeywords = currentAnalysis.keywords.map((k: any) => k.word);
-		const allKeywords = [...new Set([...learnedData.commonKeywords, ...currentKeywords])];
 		
 		// 가장 자주 언급되는 키워드 찾기
 		const keywordFrequency: { [key: string]: number } = {};
@@ -415,7 +415,6 @@
 			if (validFiles.length === 0) {
 				throw new Error('업로드된 파일이 없거나 파일 데이터가 손실되었습니다. 파일을 다시 업로드해주세요.');
 			}
-	
 			
 			// 서버 연결 시도 (선택적)
 			let uploadResult: { fileIds: string[] } = { fileIds: [] };
@@ -693,8 +692,8 @@
 		
 		<!-- 네비게이션 메뉴 -->
 		<nav class="header-nav">
-			<a href="/" class="nav-link active" data-sveltekit-preload-data="off" data-sveltekit-preload-code="off">🏠 메인</a>
-			<a href="/history" class="nav-link" data-sveltekit-preload-data="off" data-sveltekit-preload-code="off">📊 히스토리</a>
+			<a href="{base}/" class="nav-link active" data-sveltekit-preload-data="off" data-sveltekit-preload-code="off">🏠 메인</a>
+			<a href="{base}/history" class="nav-link" data-sveltekit-preload-data="off" data-sveltekit-preload-code="off">📊 히스토리</a>
 		</nav>
 		</div>
 </header>
@@ -917,7 +916,7 @@
 
 				<div class="action-grid">
 					{#if hadMediaInLastAnalysis}
-						<a class="action-btn primary" href="/history">📄 히스토리에서 회의록 다운로드</a>
+						<a class="action-btn primary" href="{base}/history">📄 히스토리에서 회의록 다운로드</a>
 					{:else}
 						<button class="action-btn primary" on:click={downloadReport}>📄 회의 결과 보고서 다운로드</button>
 					{/if}
