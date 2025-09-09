@@ -924,7 +924,7 @@ app.get('/api/learned-data', (req, res) => {
       if (!m) return false;
       const role = m[1];
       const before = nameStr.slice(0, nameStr.length - role.length).trim();
-      return /[가-힣]{2,}/.test(before);
+      return /[가-힣]{1,}/.test(before);
     };
 
     for (const h of validHistory) {
