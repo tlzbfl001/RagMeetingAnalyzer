@@ -843,14 +843,14 @@
 			<!-- 학습된 결과 섹션 -->
 			<section class="learned-section">
 				<div class="section-header">
-					<h2>📚 학습된 결과</h2>
-					<p>누적된 데이터를 기반으로 한 패턴 분석 및 미래 예측</p>
-		</div>
+					<h2>📚 과거 기록 기반 분석</h2>
+					<p>누적된 회의 데이터를 기반으로 한 패턴 분석 및 미래 예측</p>
+				</div>
 		
 				<div class="learned-grid">
 					<!-- 통계 요약 -->
 					<div class="learned-card stats-card">
-						<h3>📈 통계 요약</h3>
+						<h3>📈 누적 통계</h3>
 						<div class="stats-grid">
 							<div class="stat-item">
 								<div class="stat-number">{learnedData?.totalMeetings || 0}</div>
