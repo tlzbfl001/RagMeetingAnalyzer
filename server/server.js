@@ -58,7 +58,8 @@ const storage = multer.diskStorage({
     cb(null, 'uploads/');
   },
   filename: (req, file, cb) => {
-    const uniqueName = `${Date.now()}-${Math.round(Math.random() * 1E9)}${path.extname(file.originalname)}`;
+    const originalName = Buffer.from(file.originalname, 'latin1').toString('utf8');
+    const uniqueName = `${Date.now()}-${Math.round(Math.random() * 1E9)}${path.extname(originalName)}`;
     cb(null, uniqueName);
   }
 });
@@ -67,9 +68,12 @@ const upload = multer({
   storage: storage,
   limits: { fileSize: 100 * 1024 * 1024 }, // 100MB 제한
   fileFilter: (req, file, cb) => {
+    // 한글 파일명 디코딩
+    const originalName = Buffer.from(file.originalname, 'latin1').toString('utf8');
+    
     // 허용된 파일 확장자
     const allowedExtensions = /\.(jpeg|jpg|png|gif|mp4|avi|mov|mp3|wav|txt|pdf|doc|docx)$/i;
-    const extname = allowedExtensions.test(path.extname(file.originalname));
+    const extname = allowedExtensions.test(path.extname(originalName));
     
     // 허용된 MIME 타입
     const allowedMimeTypes = [
@@ -87,7 +91,7 @@ const upload = multer({
     if (extname && mimetype) {
       return cb(null, true);
     } else {
-      console.log(`파일 거부됨: ${file.originalname}, MIME: ${file.mimetype}, 확장자: ${path.extname(file.originalname)}`);
+      console.log(`파일 거부됨: ${originalName}, MIME: ${file.mimetype}, 확장자: ${path.extname(originalName)}`);
       cb(new Error('지원하지 않는 파일 형식입니다.'));
     }
   }
@@ -621,7 +625,7 @@ app.post('/api/analyze', upload.array('files', 10), async (req, res) => {
     // 파일 정보 수집
     /** @type {Array<any>} */
     const files = /** @type {Array<any>} */ (req.files).map(/** @param {any} file */ file => ({
-      name: file.originalname,
+      name: Buffer.from(file.originalname, 'latin1').toString('utf8'),
       size: file.size,
       type: file.mimetype,
       path: file.path
@@ -631,11 +635,12 @@ app.post('/api/analyze', upload.array('files', 10), async (req, res) => {
 
     // 텍스트 추출 (Whisper API 사용)
     let extractedTexts = [];
-    /** @type {string[]} */
+    /** @type {Array<{path: string, name: string}>} */
     const mediaPaths = [];
     for (const file of /** @type {Array<any>} */ (req.files)) {
       try {
-        if (file.mimetype.startsWith('text/') || file.originalname.endsWith('.txt')) {
+        const originalName = Buffer.from(file.originalname, 'latin1').toString('utf8');
+        if (file.mimetype.startsWith('text/') || originalName.endsWith('.txt')) {
           // 텍스트 파일
           const content = fs.readFileSync(file.path, 'utf-8');
           extractedTexts.push(content);
@@ -643,30 +648,30 @@ app.post('/api/analyze', upload.array('files', 10), async (req, res) => {
           // 음성/영상 파일
           if (FAST_MEDIA_MODE) {
             // 빠른 응답 모드: 전사는 백그라운드에서 수행
-            console.log(`FAST_MEDIA_MODE: 전사 백그라운드 처리 예정 → ${file.originalname}`);
-            mediaPaths.push(file.path);
+            console.log(`FAST_MEDIA_MODE: 전사 백그라운드 처리 예정 → ${originalName}`);
+            mediaPaths.push({path: file.path, name: originalName});
             // 즉시 분석용 텍스트에는 포함하지 않음(플레이스홀더로 응답)
             continue;
           }
           // 동기 처리 모드: Whisper로 즉시 전사
           try {
-            console.log(`음성/영상 파일 처리 중: ${file.originalname}`);
+            console.log(`음성/영상 파일 처리 중: ${originalName}`);
             if (!OPENAI_API_KEY) {
-              console.log(`🎵 ${file.originalname} - 음성 파일 분석 로그`);
-              console.log(`📊 파일 정보: ${file.originalname}, ${(file.size / 1024 / 1024).toFixed(2)} MB, ${file.mimetype}`);
+              console.log(`🎵 ${originalName} - 음성 파일 분석 로그`);
+              console.log(`📊 파일 정보: ${originalName}, ${(file.size / 1024 / 1024).toFixed(2)} MB, ${file.mimetype}`);
               console.log(`⚠️ 음성 인식 실패: OpenAI API 키가 설정되지 않았습니다`);
               console.log(`📋 API 키 설정 방법: https://platform.openai.com/api-keys`);
               extractedTexts.push(`음성 인식 실패: OpenAI API 키가 설정되지 않았습니다`);
               continue;
             }
             const transcribedText = await transcribeAudioWithWhisper(file.path);
-            console.log(`🎵 ${file.originalname} - 음성 파일 분석 로그`);
-            console.log(`📊 파일 정보: ${file.originalname}, ${(file.size / 1024 / 1024).toFixed(2)} MB, ${file.mimetype}`);
+            console.log(`🎵 ${originalName} - 음성 파일 분석 로그`);
+            console.log(`📊 파일 정보: ${originalName}, ${(file.size / 1024 / 1024).toFixed(2)} MB, ${file.mimetype}`);
             console.log(`✅ 음성 인식 성공: ${transcribedText.length}자, ${transcribedText.split(/\s+/).length}개 단어`);
             console.log(`🔍 인식된 내용:\n${transcribedText}`);
             extractedTexts.push(transcribedText);
           } catch (whisperError) {
-            console.error(`Whisper API 오류 (${file.originalname}):`, whisperError);
+            console.error(`Whisper API 오류 (${originalName}):`, whisperError);
             let errorMessage = '';
             if (whisperError.message.includes('API 키')) {
               errorMessage = 'OpenAI API 키가 설정되지 않았습니다.';
@@ -677,19 +682,20 @@ app.post('/api/analyze', upload.array('files', 10), async (req, res) => {
             } else {
               errorMessage = `음성 인식 실패: ${whisperError.message}`;
             }
-            console.log(`🎵 ${file.originalname} - 음성 파일 분석 로그`);
-            console.log(`📊 파일 정보: ${file.originalname}, ${(file.size / 1024 / 1024).toFixed(2)} MB, ${file.mimetype}`);
+            console.log(`🎵 ${originalName} - 음성 파일 분석 로그`);
+            console.log(`📊 파일 정보: ${originalName}, ${(file.size / 1024 / 1024).toFixed(2)} MB, ${file.mimetype}`);
             console.log(`⚠️ 음성 인식 실패: ${errorMessage}`);
             console.log(`🔍 오류 상세: ${whisperError.message}`);
             extractedTexts.push(`음성 인식 실패: ${errorMessage}`);
           }
         } else {
           // 기타 파일
-          extractedTexts.push(`[${file.originalname} - 지원하지 않는 파일 형식입니다.]`);
+          extractedTexts.push(`[${originalName} - 지원하지 않는 파일 형식입니다.]`);
         }
       } catch (fileError) {
-        console.error(`파일 처리 오류 (${file.originalname}):`, fileError);
-        extractedTexts.push(`[파일 처리 실패: ${file.originalname}]`);
+        const originalName = Buffer.from(file.originalname, 'latin1').toString('utf8');
+        console.error(`파일 처리 오류 (${originalName}):`, fileError);
+        extractedTexts.push(`[파일 처리 실패: ${originalName}]`);
       }
     }
 
@@ -733,12 +739,14 @@ app.post('/api/analyze', upload.array('files', 10), async (req, res) => {
           // 백그라운드에서 미디어 전사 수행 후 최종 분석
           let bgExtractedTexts = [...extractedTexts];
           if (mediaPaths.length > 0) {
-            for (const mediaPath of mediaPaths) {
+            for (const mediaInfo of mediaPaths) {
               try {
-                const t = await transcribeAudioWithWhisper(mediaPath);
+                console.log(`백그라운드 전사 시작: ${mediaInfo.name}`);
+                const t = await transcribeAudioWithWhisper(mediaInfo.path);
+                console.log(`백그라운드 전사 완료: ${mediaInfo.name}`);
                 bgExtractedTexts.push(t);
               } catch (tErr) {
-                console.error('백그라운드 전사 실패:', tErr);
+                console.error(`백그라운드 전사 실패 (${mediaInfo.name}):`, tErr);
               }
             }
           }
