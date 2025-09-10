@@ -6,10 +6,25 @@ import multer from 'multer';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import fs from 'fs';
-import { uploadToS3, downloadFromS3, isAWSEnvironment } from './s3Utils.js';
+import { uploadToS3, downloadFromS3, isAWSEnvironment, deleteFromS3, deleteMultipleFromS3, listS3Files, existsInS3 } from './s3Utils.js';
 
 // 환경변수 로드
 dotenv.config();
+
+// 공통 직함 목록
+const ROLE_TITLES = [
+  '대표','부장','사장','부사장','전무','상무','이사','이사장','회장','사장대행','고문','자문',
+  '본부장','센터장','그룹장','실장','팀장','파트장','지점장','소장','과장','차장','대리','주임','사원',
+  '수석','책임','선임','전임','연구원','주임연구원','선임연구원','책임연구원','수석연구원',
+  '박사','석사','학사','전문위원','전문가','컨설턴트','PM','PO','PL','QA','QC',
+  '개발자','엔지니어','디자이너','기획자','분석가','데이터사이언티스트','데이터엔지니어','ML엔지니어','리서처',
+  '마케터','세일즈','영업','CS','고객지원','운영','매니저','코치','트레이너','강사','교수','교사',
+  '회계사','변호사','변리사','세무사','노무사','감사','내부감사','재무담당','인사담당','총무담당','법무담당',
+  'PR담당','IR담당','브랜드매니저','프로덕트오너','프로덕트매니저','프로젝트매니저','UX리서처','UX디자이너','UI디자이너',
+  '백엔드','프론트엔드','풀스택','클라우드아키텍트','아키텍트','SRE','보안담당','CISO','CFO','CTO','COO','CEO',
+  '대표이사','총괄','책임자','실무자','담당자','주관','주최','발표자','발언자','사회자','진행자',
+  '인턴','수습','신입','주니어','시니어','리드','헤드','디렉터','VP'
+];
 
 // 현재 작업 디렉토리 설정 (ES 모듈에서 __dirname 대체)
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -83,12 +98,21 @@ const upload = multer({
       'text/plain',
       'application/pdf',
       'application/msword',
-      'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+      'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      'application/octet-stream' // curl 등에서 파일 타입을 제대로 감지하지 못할 때
     ];
     
     const mimetype = allowedMimeTypes.includes(file.mimetype);
     
+    // 디버깅 로그 추가
+    console.log(`파일 필터 체크: ${originalName}`);
+    console.log(`  - MIME 타입: ${file.mimetype}`);
+    console.log(`  - 확장자: ${path.extname(originalName)}`);
+    console.log(`  - 확장자 체크: ${extname}`);
+    console.log(`  - MIME 체크: ${mimetype}`);
+    
     if (extname && mimetype) {
+      console.log(`파일 허용: ${originalName}`);
       return cb(null, true);
     } else {
       console.log(`파일 거부됨: ${originalName}, MIME: ${file.mimetype}, 확장자: ${path.extname(originalName)}`);
@@ -140,26 +164,66 @@ function loadSavedData() {
       console.log('저장된 학습 데이터 로드됨');
     }
 
-    // uploads와 정합성: 존재하지 않는 파일을 참조하는 히스토리 제거
-    const uploadPath = path.join(__dirname, 'uploads');
-    if (fs.existsSync(uploadPath)) {
-      const fileSet = new Set(fs.readdirSync(uploadPath));
+    // 파일과 정합성: 존재하지 않는 파일을 참조하는 히스토리 제거
+    if (isAWSEnvironment()) {
+      // AWS 환경: S3 파일과 정합성 체크
       const before = analysisHistory.length;
-      analysisHistory = analysisHistory.filter(h => {
+      const validHistory = [];
+      
+      for (const h of analysisHistory) {
         try {
-          if (!h.files || !Array.isArray(h.files) || h.files.length === 0) return false;
-          // 히스토리의 모든 파일이 uploads에 존재해야 유효
-          return h.files.every(f => f.serverFilename ? fileSet.has(f.serverFilename) : fileSet.has(f.name));
-        } catch { return false; }
-      });
+          if (!h.files || !Array.isArray(h.files) || h.files.length === 0) continue;
+          
+          // 히스토리의 모든 파일이 S3에 존재하는지 확인
+          let allFilesExist = true;
+          for (const f of h.files) {
+            const s3Key = f.serverFilename ? `${h.id}/${f.serverFilename}` : `${h.id}/${f.name}`;
+            const exists = await existsInS3(s3Key);
+            if (!exists) {
+              allFilesExist = false;
+              break;
+            }
+          }
+          
+          if (allFilesExist) {
+            validHistory.push(h);
+          }
+        } catch { continue; }
+      }
+      
+      analysisHistory = validHistory;
       if (before !== analysisHistory.length) {
-        console.log(`정합성 정리: ${before - analysisHistory.length}개 히스토리 제거`);
+        console.log(`S3 정합성 정리: ${before - analysisHistory.length}개 히스토리 제거`);
+      }
+      
+      // S3에 파일이 없으면 히스토리 초기화
+      const s3Files = await listS3Files();
+      if (s3Files.length === 0 && analysisHistory.length > 0) {
+        analysisHistory = [];
+        console.log('S3 비어있음: 히스토리 초기화');
       }
     } else {
-      // uploads 폴더가 없거나 비어있으면 히스토리 초기화
-      if (analysisHistory.length > 0) {
-        analysisHistory = [];
-        console.log('uploads 비어있음: 히스토리 초기화');
+      // 로컬 환경: uploads 폴더와 정합성 체크
+      const uploadPath = path.join(__dirname, 'uploads');
+      if (fs.existsSync(uploadPath)) {
+        const fileSet = new Set(fs.readdirSync(uploadPath));
+        const before = analysisHistory.length;
+        analysisHistory = analysisHistory.filter(h => {
+          try {
+            if (!h.files || !Array.isArray(h.files) || h.files.length === 0) return false;
+            // 히스토리의 모든 파일이 uploads에 존재해야 유효
+            return h.files.every(f => f.serverFilename ? fileSet.has(f.serverFilename) : fileSet.has(f.name));
+          } catch { return false; }
+        });
+        if (before !== analysisHistory.length) {
+          console.log(`로컬 정합성 정리: ${before - analysisHistory.length}개 히스토리 제거`);
+        }
+      } else {
+        // uploads 폴더가 없거나 비어있으면 히스토리 초기화
+        if (analysisHistory.length > 0) {
+          analysisHistory = [];
+          console.log('uploads 비어있음: 히스토리 초기화');
+        }
       }
     }
 
@@ -196,20 +260,6 @@ loadSavedData();
 
 // 학습데이터 재계산 함수 (uploads 기반 히스토리로부터)
 function recomputeLearnedData() {
-  // 화자 직함(역할) 사전 – 직군/직책/직위/호칭 등을 폭넓게 포함 (100+)
-  const ROLE_TITLES = [
-    '대표','부장','사장','부사장','전무','상무','이사','이사장','회장','사장대행','고문','자문',
-    '본부장','센터장','그룹장','실장','팀장','파트장','지점장','소장','과장','차장','대리','주임','사원',
-    '수석','책임','선임','전임','연구원','주임연구원','선임연구원','책임연구원','수석연구원',
-    '박사','석사','학사','전문위원','전문가','컨설턴트','PM','PO','PL','QA','QC',
-    '개발자','엔지니어','디자이너','기획자','분석가','데이터사이언티스트','데이터엔지니어','ML엔지니어','리서처',
-    '마케터','세일즈','영업','CS','고객지원','운영','매니저','코치','트레이너','강사','교수','교사',
-    '회계사','변호사','변리사','세무사','노무사','감사','내부감사','재무담당','인사담당','총무담당','법무담당',
-    'PR담당','IR담당','브랜드매니저','프로덕트오너','프로덕트매니저','프로젝트매니저','UX리서처','UX디자이너','UI디자이너',
-    '백엔드','프론트엔드','풀스택','클라우드아키텍트','아키텍트','SRE','보안담당','CISO','CFO','CTO','COO','CEO',
-    '대표이사','총괄','책임자','실무자','담당자','주관','주최','발표자','발언자','사회자','진행자',
-    '인턴','수습','신입','주니어','시니어','리드','헤드','디렉터','VP'
-  ];
   const INVALID_NAME_TOKENS = [];
   const ROLE_REGEX = new RegExp(`(${ROLE_TITLES.join('|')})$`);
   const totals = { totalMeetings: analysisHistory.length };
@@ -288,9 +338,9 @@ async function callOllama(prompt, systemPrompt = '') {
       throw new Error('Ollama 서버 연결 실패');
     }
 
-    // 타임아웃 설정
+    // 타임아웃 설정 (큰 모델용으로 2분으로 증가)
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 30000);
+    const timeoutId = setTimeout(() => controller.abort(), 120000);
 
     const response = await fetch(`${OLLAMA_HOST}/api/generate`, {
       method: 'POST',
@@ -333,14 +383,27 @@ async function analyzeMeeting(text) {
       console.log('USE_OLLAMA=false: Ollama 호출 우회, 기본 분석 사용');
       return fallbackAnalysis(text);
     }
+    
+    // 화자명 유효성 검사 함수 (직함이 있는 화자명만 허용)
+    const isValidRoleName = (name) => {
+      if (!name) return false;
+      const nameStr = String(name).trim();
+      
+      // 직함이 있는 경우만 허용
+      const roleRegex = new RegExp(`(${ROLE_TITLES.join('|')})$`);
+      const m = nameStr.match(roleRegex);
+      if (!m) return false;
+      const role = m[1];
+      const before = nameStr.slice(0, nameStr.length - role.length).trim();
+      return /[가-힣]{1,}/.test(before);
+    };
     // AI 분석 프롬프트
-    const analysisPrompt = `
-다음 회의 내용을 분석해주세요. JSON 형식으로 응답해주세요.
+    const analysisPrompt = `다음 회의 내용을 분석하고 완전한 JSON 형식으로만 응답하세요. 모든 필드를 포함해야 합니다.
 
 회의 내용:
 ${text}
 
-다음 형식으로 분석해주세요:
+반드시 다음 형식의 완전한 JSON으로 응답하세요:
 {
   "summary": "회의 요약 (100자 이내)",
   "speakers": [{"name": "화자명", "count": 발언횟수, "percentage": 발언비중}],
@@ -349,23 +412,63 @@ ${text}
   "keyPoints": ["주요포인트1", "주요포인트2", "주요포인트3"]
 }
 
-주의사항:
-1. 화자가 없으면 speakers 배열을 빈 배열로 반환
-2. 화자가 있으면 실제 텍스트에서 찾은 화자만 포함
-3. 발언횟수는 실제 텍스트에서 해당 화자명이 언급된 횟수
-4. 발언비중은 전체 발언 중 해당 화자의 비율 (0-100%)
-5. 더미 데이터나 가상의 화자는 포함하지 마세요
-`;
+중요한 규칙:
+1. 반드시 모든 필드(summary, speakers, keywords, sentiment, keyPoints)를 포함하세요
+2. 화자가 없으면 speakers는 빈 배열 []로 설정
+3. 화자가 있으면 실제 텍스트에서 찾은 화자만 포함
+4. sentiment는 0-1 사이의 숫자로 설정 (예: 0.7, 0.2, 0.1)
+5. JSON 외의 다른 텍스트는 절대 포함하지 마세요
+6. 하나의 완전한 JSON 객체만 응답하세요`;
 
     const aiResponse = await callOllama(analysisPrompt);
+    console.log('AI 응답 원본:', aiResponse);
     
     // JSON 파싱 시도
     try {
-      const parsedResponse = JSON.parse(aiResponse);
+      // AI 응답에서 첫 번째 JSON 객체만 추출
+      let jsonText = aiResponse;
+      
+      // 첫 번째 JSON 객체의 시작과 끝을 찾아서 추출
+      const jsonStart = jsonText.indexOf('{');
+      if (jsonStart === -1) {
+        throw new Error('JSON 시작을 찾을 수 없습니다');
+      }
+      
+      // 중괄호 카운팅으로 첫 번째 JSON 객체의 끝 찾기
+      let braceCount = 0;
+      let jsonEnd = -1;
+      for (let i = jsonStart; i < jsonText.length; i++) {
+        if (jsonText[i] === '{') braceCount++;
+        if (jsonText[i] === '}') braceCount--;
+        if (braceCount === 0) {
+          jsonEnd = i + 1;
+          break;
+        }
+      }
+      
+      if (jsonEnd > jsonStart) {
+        jsonText = jsonText.substring(jsonStart, jsonEnd);
+        console.log('추출된 JSON:', jsonText);
+      } else {
+        throw new Error('JSON 끝을 찾을 수 없습니다');
+      }
+      
+      const parsedResponse = JSON.parse(jsonText);
+      console.log('파싱된 응답:', parsedResponse);
+      
+      // 화자 필터링: 직함이 있는 화자만 유지
+      if (parsedResponse.speakers && Array.isArray(parsedResponse.speakers)) {
+        parsedResponse.speakers = parsedResponse.speakers.filter(speaker => {
+          const name = speaker.name || String(speaker);
+          return isValidRoleName(name);
+        });
+      }
+      
       return parsedResponse;
     } catch (parseError) {
       // JSON 파싱 실패 시 기본 분석
       console.log('AI 응답 JSON 파싱 실패, 기본 분석 사용:', aiResponse);
+      console.log('파싱 오류:', parseError.message);
       return fallbackAnalysis(text);
     }
   } catch (error) {
@@ -424,16 +527,22 @@ function fallbackAnalysis(text) {
   const hasPositiveWords = /좋|성공|성장|향상|긍정|우수|완료|완성/.test(text);
   const hasNegativeWords = /문제|실패|어려움|부정|실패|지연|취소/.test(text);
   
+  // 화자명 유효성 검사 함수 (직함이 있는 화자명만 허용)
+  const isValidRoleName = (name) => {
+    if (!name) return false;
+    const nameStr = String(name).trim();
+    
+    // 직함이 있는 경우만 허용
+    const roleRegex = new RegExp(`(${ROLE_TITLES.join('|')})$`);
+    const m = nameStr.match(roleRegex);
+    if (!m) return false;
+    const role = m[1];
+    const before = nameStr.slice(0, nameStr.length - role.length).trim();
+    return /[가-힣]{1,}/.test(before);
+  };
+  
   // 화자 추출 - 엄격한 패턴으로 찾기
   let speakers = [];
-  
-  // 화자로 인식할 수 있는 직급/역할 목록
-  const validRoles = [
-    '대표', '사장', '회장', '이사장', 'CEO', '이사', '상무', '전무', '부사장', '사장대행',
-    '부장', '본부장', '그룹장', '센터장', '실장', '팀장', '과장', '수석', '책임', '선임', '주임',
-    '대리', '사원', '연구원', '개발자', '엔지니어', '디자이너', '기획자', '마케터', '영업',
-    '고객', '파트너', '협력사', '컨설턴트', '변호사', '회계사', '학생', '인턴', '수습', '신입'
-  ];
   
   // 방법 1: "이름:" 패턴으로 찾기 (가장 신뢰할 수 있는 패턴)
   const namePattern1 = text.match(/([가-힣]{2,4}):/g) || [];
@@ -463,58 +572,7 @@ function fallbackAnalysis(text) {
   const allNames = [...names1, ...names2, ...names3];
   
   // 화자 필터링 - 엄격한 조건 적용
-  speakers = Array.from(new Set(allNames)).filter(name => {
-    // 기본 조건
-    if (name.length < 2 || name.length > 4) return false;
-    
-    // 화자가 될 수 없는 단어들 제외
-    const invalidWords = [
-      '회의', '프로젝트', '시장', '분석', '계획', '고객', '개발', '마케팅', '제품', '서비스',
-      '매출', '수익', '비용', '예산', '투자', '자금', '재무', '인사', '채용', '교육',
-      '훈련', '성과', '목표', '전략', '전술', '운영', '관리', '품질', '보안', '인프라',
-      '시스템', '플랫폼', '솔루션', '데이터', '정보', '지식', '혁신', '창의성', '효율성',
-      '생산성', '협업', '소통', '리더십', '팀워크', '문화', '가치', '미션', '비전', '성장',
-      '확장', '글로벌', '국제', '지역', '산업', '섹터', '경쟁', '협력', '파트너십', '네트워크',
-      '커뮤니티', '스테이크홀더', '주주', '이해관계자', '고객만족', '고객경험', '브랜드', '이미지', '평판', '신뢰',
-      '윤리', '지속가능성', '환경', '사회', '거버넌스', 'ESG', '리스크', '위험', '보험', '법무',
-      '규정', '정책', '절차', '표준', '가이드라인', '체크리스트', '템플릿', '프로세스', '워크플로우', '자동화',
-      '디지털화', '전자화', '온라인', '오프라인', '하이브리드', '원격', '재택', '사무실', '공간', '환경',
-      '설비', '장비', '도구', '소프트웨어', '하드웨어', '클라우드', '서버', '데이터베이스', 'API', '인터페이스',
-      '사용자', '관리자', '테스터', '분석가', '전문가', '전문직', '일반직', '계약직', '정규직', '비정규직',
-      '아르바이트', '신입', '경력', '시니어', '주니어', '수습', '수습기간', '평가', '성과평가', '인사고과',
-      '승진', '승급', '보상', '급여', '연봉', '상여금', '성과급', '스톡옵션', '주식', '지분', '소유권',
-      '경영권', '의결권', '참여권', '감시권', '감사', '회계', '세무', '법인세', '부가가치세', '소득세',
-      '재무제표', '손익계산서', '재무상태표', '현금흐름표', '자본변동표', '재무비율', '수익성', '안정성', '성장성', '효율성',
-      '유동비율', '부채비율', 'ROE', 'ROA', 'ROI', 'EPS', 'PER', 'PBR', 'EV/EBITDA', '현금흐름',
-      '운전자본', '자본금', '자본잉여금', '이익잉여금', '자본조정', '자본거래', '자본변동', '자본구조', '자본조달', '자본배분',
-      '배당', '배당률', '배당정책', '배당성향', '배당수익률', '배당성장률', '배당안정성', '배당지속성', '배당가능성', '배당의지',
-      '기업가치', '주가', '주식가격', '시가총액', '기업가치평가', 'DCF', '할인율', '성장률', '영구가치', '잔존가치',
-      'M&A', '합병', '인수', '매각', '분할', '분사', '지주회사', '자회사', '관계회사', '계열사',
-      '전략적제휴', '기술제휴', '마케팅제휴', '유통제휴', '생산제휴', '연구개발제휴', '라이센싱', '프랜차이징', '대리점', '직영점',
-      '온라인쇼핑몰', '오프라인매장', '멀티채널', '옴니채널', '크로스채널', '통합마케팅', '디지털마케팅', '소셜마케팅', '콘텐츠마케팅', '바이럴마케팅',
-      '인플루언서', 'KOL', '키오스크', '자동판매기', 'POS', '결제시스템', '전자결제', '모바일결제', 'QR결제', '바이오인증',
-      '블록체인', '암호화폐', '가상화폐', '디지털자산', 'NFT', '메타버스', 'AI', '머신러닝', '딥러닝', '빅데이터',
-      '데이터마이닝', '데이터분석', '통계', '예측', '모델링', '시뮬레이션', '최적화', '알고리즘', '코딩', '프로그래밍',
-      '테스트', '디버깅', '배포', '운영', '모니터링', '로깅', '백업', '복구', '보안', '암호화',
-      '인증', '권한', '접근제어', '방화벽', '백신', '백도어', '해킹', '피싱', '랜섬웨어', '스팸',
-      '개인정보', '데이터보호', 'GDPR', '개인정보보호법', '정보통신망법', '전자상거래법', '소비자보호법', '공정거래법', '독점규제법', '부정경쟁방지법'
-    ];
-    
-    if (invalidWords.includes(name)) return false;
-    
-    // 한글 이름 패턴 확인 (성+이름 형태)
-    const koreanNamePattern = /^[가-힣]{2,4}$/;
-    if (!koreanNamePattern.test(name)) return false;
-    
-    // 실제 화자로 보이는 패턴인지 확인
-    const hasValidContext = text.includes(`${name}:`) || 
-                           text.includes(`${name} (`) || 
-                           text.includes(` ${name}`) ||
-                           text.includes(`${name}님`) ||
-                           text.includes(`${name}씨`);
-    
-    return hasValidContext;
-  });
+  speakers = Array.from(new Set(allNames)).filter(name => isValidRoleName(name));
   
   // 키워드 추출 (200개 이상 비즈니스 키워드)
   const commonWords = [
@@ -555,13 +613,16 @@ function fallbackAnalysis(text) {
     return { word, count, weight: count * 10 };
   }).filter(k => k.count > 0).sort((a, b) => b.count - a.count);
   
+  // 최종 화자 필터링: isValidRoleName 함수 사용
+  const validSpeakers = speakers.filter(speaker => isValidRoleName(speaker));
+  
   return {
-    summary: speakers.length > 0 
-      ? `기본 분석: ${wordCount}단어, ${speakers.length}명의 참석자가 확인되었습니다.`
+    summary: validSpeakers.length > 0 
+      ? `기본 분석: ${wordCount}단어, ${validSpeakers.length}명의 참석자가 확인되었습니다.`
       : `기본 분석: ${wordCount}단어, 참석자 정보가 확인되지 않았습니다.`,
-    speakers: speakers.length > 0 ? speakers.map((speaker) => {
+    speakers: validSpeakers.length > 0 ? validSpeakers.map((speaker) => {
       const count = (text.match(new RegExp(speaker, 'g')) || []).length;
-      const totalMentions = speakers.reduce((sum, s) => sum + (text.match(new RegExp(s, 'g')) || []).length, 0);
+      const totalMentions = validSpeakers.reduce((sum, s) => sum + (text.match(new RegExp(s, 'g')) || []).length, 0);
       const percentage = totalMentions > 0 ? Math.round((count / totalMentions) * 100) : 0;
       
       return {
@@ -614,7 +675,6 @@ app.post('/api/analyze', upload.array('files', 10), async (req, res) => {
   const uploadedFiles = [];
   
   try {
-    console.time('analyze_total');
     if (!req.files || req.files.length === 0) {
       return res.status(400).json({ error: '업로드된 파일이 없습니다.' });
     }
@@ -635,8 +695,6 @@ app.post('/api/analyze', upload.array('files', 10), async (req, res) => {
 
     // 텍스트 추출 (Whisper API 사용)
     let extractedTexts = [];
-    /** @type {Array<{path: string, name: string}>} */
-    const mediaPaths = [];
     for (const file of /** @type {Array<any>} */ (req.files)) {
       try {
         const originalName = decodeURIComponent(escape(file.originalname));
@@ -644,29 +702,17 @@ app.post('/api/analyze', upload.array('files', 10), async (req, res) => {
           // 텍스트 파일
           const content = fs.readFileSync(file.path, 'utf-8');
           extractedTexts.push(content);
-        } else if (file.mimetype.startsWith('audio/') || file.mimetype.startsWith('video/')) {
-          // 음성/영상 파일
-          if (FAST_MEDIA_MODE) {
-            // 빠른 응답 모드: 전사는 백그라운드에서 수행하지만 즉시 분석도 진행
-            console.log(`FAST_MEDIA_MODE: 전사 백그라운드 처리 예정 → ${originalName}`);
-            mediaPaths.push({path: file.path, name: originalName});
-            // 즉시 분석을 위해 플레이스홀더 텍스트 추가
-            extractedTexts.push(`[음성/영상 파일: ${originalName} - 전사 진행 중]`);
-            continue;
-          }
+        } else if (file.mimetype.startsWith('audio/') || file.mimetype.startsWith('video/') || 
+                   originalName.match(/\.(mp3|wav|mp4|avi|mov)$/i)) {
+          // 음성/영상 파일 - 항상 동기 처리로 전사 완료 후 분석
           // 동기 처리 모드: Whisper로 즉시 전사
           try {
-            console.log(`음성/영상 파일 처리 중: ${originalName}`);
             if (!OPENAI_API_KEY) {
-              console.log(`🎵 ${originalName} - 음성 파일 분석 로그`);
               console.log(`📊 파일 정보: ${originalName}, ${(file.size / 1024 / 1024).toFixed(2)} MB, ${file.mimetype}`);
               console.log(`⚠️ 음성 인식 실패: OpenAI API 키가 설정되지 않았습니다`);
-              console.log(`📋 API 키 설정 방법: https://platform.openai.com/api-keys`);
-              extractedTexts.push(`음성 인식 실패: OpenAI API 키가 설정되지 않았습니다`);
               continue;
             }
             const transcribedText = await transcribeAudioWithWhisper(file.path);
-            console.log(`🎵 ${originalName} - 음성 파일 분석 로그`);
             console.log(`📊 파일 정보: ${originalName}, ${(file.size / 1024 / 1024).toFixed(2)} MB, ${file.mimetype}`);
             console.log(`✅ 음성 인식 성공: ${transcribedText.length}자, ${transcribedText.split(/\s+/).length}개 단어`);
             console.log(`🔍 인식된 내용:\n${transcribedText}`);
@@ -683,7 +729,6 @@ app.post('/api/analyze', upload.array('files', 10), async (req, res) => {
             } else {
               errorMessage = `음성 인식 실패: ${whisperError.message}`;
             }
-            console.log(`🎵 ${originalName} - 음성 파일 분석 로그`);
             console.log(`📊 파일 정보: ${originalName}, ${(file.size / 1024 / 1024).toFixed(2)} MB, ${file.mimetype}`);
             console.log(`⚠️ 음성 인식 실패: ${errorMessage}`);
             console.log(`🔍 오류 상세: ${whisperError.message}`);
@@ -705,69 +750,7 @@ app.post('/api/analyze', upload.array('files', 10), async (req, res) => {
       throw new Error('텍스트를 추출할 수 있는 파일이 없습니다.');
     }
 
-    // 미디어 파일이 포함된 경우 즉시 응답 모드 지원
-    const hasMedia = files.some(f => f.type?.startsWith('audio/') || f.type?.startsWith('video/'));
-    if (hasMedia) {
-      // 1) 히스토리에 플레이스홀더 저장
-      const placeholder = {
-        id: analysisId,
-        date: analysisDate,
-        files: files.map(f => ({ name: f.name, size: f.size, type: f.type, serverFilename: path.basename(f.path) })),
-        extractedTexts, // 미디어면 보통 빈 배열이거나 간단 메시지
-        analysisResults: {
-          summary: '전사/분석 진행 중... (곧 결과가 반영됩니다)',
-          speakers: [],
-          keywords: [],
-          sentiment: { positive: 0, negative: 0, neutral: 100 },
-          keyPoints: ['전사 대기중']
-        }
-      };
-      analysisHistory.unshift(placeholder);
-      persistData();
-
-      // 2) 즉시 응답
-      res.json({
-        success: true,
-        analysisId,
-        results: placeholder.analysisResults,
-        message: '전사/분석이 백그라운드에서 진행됩니다.'
-      });
-      console.timeEnd('analyze_total');
-
-      // 3) 백그라운드에서 전사 및 분석 → 히스토리 업데이트
-      (async () => {
-        try {
-          // 백그라운드에서 미디어 전사 수행 후 최종 분석
-          let bgExtractedTexts = [...extractedTexts];
-          if (mediaPaths.length > 0) {
-            for (const mediaInfo of mediaPaths) {
-              try {
-                console.log(`백그라운드 전사 시작: ${mediaInfo.name}`);
-                const t = await transcribeAudioWithWhisper(mediaInfo.path);
-                console.log(`백그라운드 전사 완료: ${mediaInfo.name}`);
-                bgExtractedTexts.push(t);
-              } catch (tErr) {
-                console.error(`백그라운드 전사 실패 (${mediaInfo.name}):`, tErr);
-              }
-            }
-          }
-          const bgAllText = bgExtractedTexts.join('\n\n');
-          const finalResults = await analyzeMeeting(bgAllText);
-          // 히스토리 내 해당 항목 업데이트
-          const idx = analysisHistory.findIndex(h => h.id === analysisId);
-          if (idx !== -1) {
-            analysisHistory[idx].analysisResults = finalResults;
-            analysisHistory[idx].extractedTexts = bgExtractedTexts;
-            recomputeLearnedData();
-            persistData();
-          }
-        } catch (bgErr) {
-          console.error('백그라운드 전사/분석 실패:', bgErr);
-        }
-      })();
-
-      return; // 즉시 종료
-    }
+    // 미디어 파일도 동기 처리로 완료되었으므로 일반 분석 경로로 진행
 
     // AI 분석 수행 (일반 경로)
     const allText = extractedTexts.join('\n\n');
@@ -787,7 +770,6 @@ app.post('/api/analyze', upload.array('files', 10), async (req, res) => {
     // AWS 환경인 경우 파일을 S3에 업로드 (비동기, 응답 이후 처리)
     if (isAWSEnvironment()) {
       (async () => {
-        console.log('AWS 환경 감지: 응답 이후 S3 업로드를 백그라운드에서 수행합니다...');
         for (const file of files) {
           try {
             const s3Key = `${analysisId}/${file.name}`;
@@ -848,12 +830,40 @@ app.post('/api/analyze', upload.array('files', 10), async (req, res) => {
   }
 });
 
-// 3. 분석 히스토리 조회 (저장된 히스토리에서, 단 uploads에 있는 항목만)
-app.get('/api/history', (req, res) => {
+// 3. 분석 히스토리 조회 (저장된 히스토리에서, 단 파일이 존재하는 항목만)
+app.get('/api/history', async (req, res) => {
   try {
-    const uploadPath = path.join(__dirname, 'uploads');
-    const fileSet = fs.existsSync(uploadPath) ? new Set(fs.readdirSync(uploadPath)) : new Set();
-    const filtered = analysisHistory.filter(h => h.files?.every(f => f.serverFilename ? fileSet.has(f.serverFilename) : fileSet.has(f.name)));
+    let filtered = [];
+    
+    if (isAWSEnvironment()) {
+      // AWS 환경: S3 파일 존재 여부로 필터링
+      for (const h of analysisHistory) {
+        try {
+          if (!h.files || !Array.isArray(h.files) || h.files.length === 0) continue;
+          
+          // 히스토리의 모든 파일이 S3에 존재하는지 확인
+          let allFilesExist = true;
+          for (const f of h.files) {
+            const s3Key = f.serverFilename ? `${h.id}/${f.serverFilename}` : `${h.id}/${f.name}`;
+            const exists = await existsInS3(s3Key);
+            if (!exists) {
+              allFilesExist = false;
+              break;
+            }
+          }
+          
+          if (allFilesExist) {
+            filtered.push(h);
+          }
+        } catch { continue; }
+      }
+    } else {
+      // 로컬 환경: uploads 폴더 파일 존재 여부로 필터링
+      const uploadPath = path.join(__dirname, 'uploads');
+      const fileSet = fs.existsSync(uploadPath) ? new Set(fs.readdirSync(uploadPath)) : new Set();
+      filtered = analysisHistory.filter(h => h.files?.every(f => f.serverFilename ? fileSet.has(f.serverFilename) : fileSet.has(f.name)));
+    }
+    
     res.json({ success: true, data: filtered, total: filtered.length });
   } catch (error) {
     res.status(500).json({ error: '히스토리 조회 중 오류가 발생했습니다.' });
@@ -906,19 +916,6 @@ app.get('/api/learned-data', (req, res) => {
     // 직함이 있는 화자만 필터링하는 함수
     const isValidRoleName = (name) => {
       if (!name) return false;
-      const ROLE_TITLES = [
-        '대표','부장','사장','부사장','전무','상무','이사','이사장','회장','사장대행','고문','자문',
-        '본부장','센터장','그룹장','실장','팀장','파트장','지점장','소장','과장','차장','대리','주임','사원',
-        '수석','책임','선임','전임','연구원','주임연구원','선임연구원','책임연구원','수석연구원',
-        '박사','석사','학사','전문위원','전문가','컨설턴트','PM','PO','PL','QA','QC',
-        '개발자','엔지니어','디자이너','기획자','분석가','데이터사이언티스트','데이터엔지니어','ML엔지니어','리서처',
-        '마케터','세일즈','영업','CS','고객지원','운영','매니저','코치','트레이너','강사','교수','교사',
-        '회계사','변호사','변리사','세무사','노무사','감사','내부감사','재무담당','인사담당','총무담당','법무담당',
-        'PR담당','IR담당','브랜드매니저','프로덕트오너','프로덕트매니저','프로젝트매니저','UX리서처','UX디자이너','UI디자이너',
-        '백엔드','프론트엔드','풀스택','클라우드아키텍트','아키텍트','SRE','보안담당','CISO','CFO','CTO','COO','CEO',
-        '대표이사','총괄','책임자','실무자','담당자','주관','주최','발표자','발언자','사회자','진행자',
-        '인턴','수습','신입','주니어','시니어','리드','헤드','디렉터','VP'
-      ];
       const nameStr = String(name).trim();
       const roleRegex = new RegExp(`(${ROLE_TITLES.join('|')})$`);
       const m = nameStr.match(roleRegex);
@@ -985,17 +982,27 @@ app.delete('/api/analysis/:id', (req, res) => {
       return res.json({ success: true, message: '해당 분석 결과가 이미 삭제되었거나 존재하지 않습니다.' });
     }
 
-    // 해당 항목에 연결된 파일 삭제 (uploads에서)
+    // 해당 항목에 연결된 파일 삭제
     try {
-      const uploadPath = path.join(__dirname, 'uploads');
       const files = analysisHistory[idx].files || [];
-      for (const f of files) {
-        const candidate = f.serverFilename ? path.join(uploadPath, f.serverFilename) : path.join(uploadPath, f.name);
-        try {
-          if (fs.existsSync(candidate) && fs.statSync(candidate).isFile()) {
-            fs.unlinkSync(candidate);
-          }
-        } catch {}
+      
+      if (isAWSEnvironment()) {
+        // AWS 환경: S3에서 파일 삭제
+        for (const f of files) {
+          const s3Key = f.serverFilename ? `${analysisHistory[idx].id}/${f.serverFilename}` : `${analysisHistory[idx].id}/${f.name}`;
+          await deleteFromS3(s3Key);
+        }
+      } else {
+        // 로컬 환경: uploads 폴더에서 파일 삭제
+        const uploadPath = path.join(__dirname, 'uploads');
+        for (const f of files) {
+          const candidate = f.serverFilename ? path.join(uploadPath, f.serverFilename) : path.join(uploadPath, f.name);
+          try {
+            if (fs.existsSync(candidate) && fs.statSync(candidate).isFile()) {
+              fs.unlinkSync(candidate);
+            }
+          } catch {}
+        }
       }
     } catch {}
 
@@ -1014,27 +1021,38 @@ app.delete('/api/analysis/:id', (req, res) => {
 });
 
 // 7. 모든 분석 결과 삭제 (전체 초기화)
-app.delete('/api/analysis', (req, res) => {
+app.delete('/api/analysis', async (req, res) => {
   try {
-    // uploads 폴더 내 모든 파일 삭제만 수행
-    const uploadPath = path.join(__dirname, 'uploads');
-    if (fs.existsSync(uploadPath)) {
-      const files = fs.readdirSync(uploadPath);
-      files.forEach(/** @param {string} file */ file => {
-        const fullPath = path.join(uploadPath, file);
-        try {
-          const stats = fs.statSync(fullPath);
-          if (stats.isFile()) {
-            fs.unlinkSync(fullPath);
-          }
-        } catch {}
-      });
+    if (isAWSEnvironment()) {
+      // AWS 환경: S3의 모든 파일 삭제
+      const s3Files = await listS3Files();
+      if (s3Files.length > 0) {
+        await deleteMultipleFromS3(s3Files);
+      }
+    } else {
+      // 로컬 환경: uploads 폴더 내 모든 파일 삭제
+      const uploadPath = path.join(__dirname, 'uploads');
+      if (fs.existsSync(uploadPath)) {
+        const files = fs.readdirSync(uploadPath);
+        files.forEach(/** @param {string} file */ file => {
+          const fullPath = path.join(uploadPath, file);
+          try {
+            const stats = fs.statSync(fullPath);
+            if (stats.isFile()) {
+              fs.unlinkSync(fullPath);
+            }
+          } catch {}
+        });
+      }
     }
-    // 기록 완전 초기화 (uploads 비우면 데이터도 비움)
+    
+    // 기록 완전 초기화 (파일 비우면 데이터도 비움)
     analysisHistory = [];
     learnedData = { totalMeetings: 0, commonKeywords: [], speakerPatterns: [], sentimentTrends: [], futurePredictions: [] };
     persistData();
-    return res.json({ success: true, message: 'uploads와 데이터 기록을 모두 정리했습니다.' });
+    
+    const message = isAWSEnvironment() ? 'S3와 데이터 기록을 모두 정리했습니다.' : 'uploads와 데이터 기록을 모두 정리했습니다.';
+    return res.json({ success: true, message });
   } catch (error) {
     console.error('파일 삭제 중 오류:', error);
     return res.status(500).json({ error: '파일 삭제 중 오류가 발생했습니다.' });

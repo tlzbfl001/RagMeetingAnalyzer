@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { generateCommonMeetingReport } from '$lib/meetingReport.js';
 	import { base } from '$app/paths';
+	import { onMount } from 'svelte';
 	
 	interface FileInfo {
 		id: string;
@@ -49,6 +50,11 @@
 			.finally(() => clearTimeout(id));
 	}
 
+	// 페이지 로드 시 데이터 로드
+	onMount(() => {
+		loadData();
+	});
+
 	async function loadData() {
 		try {
 			// 서버에서 히스토리 데이터 가져오기
@@ -56,14 +62,14 @@
 			if (response.ok) {
 				const result = await response.json();
 				analysisHistory = result.data || [];
-				console.log('서버에서 히스토리 로드:', analysisHistory);
+				console.log('서버에서 히스토리 로드:', analysisHistory.length, '개');
 			} else {
 				console.error('히스토리 로드 실패:', response.status);
 				// 서버 실패 시 로컬 스토리지에서 로드 (fallback)
 				const savedHistory = localStorage.getItem('analysisHistory');
 				if (savedHistory) {
 					analysisHistory = JSON.parse(savedHistory) || [];
-					console.log('로컬에서 히스토리 로드:', analysisHistory);
+					console.log('로컬에서 히스토리 로드:', analysisHistory.length, '개');
 				}
 			}
 			
@@ -159,7 +165,6 @@
 		}
 
 		const files = Array.from(target.files);
-		console.log('선택된 파일들:', files);
 		
 		const newFiles: FileInfo[] = files.map(file => ({
 			id: Math.random().toString(36).substr(2, 9),
@@ -172,11 +177,6 @@
 		uploadedFiles = [...uploadedFiles, ...newFiles];
 		console.log('전체 업로드된 파일:', uploadedFiles);
 		target.value = '';
-	}
-
-	function openFileDialog() {
-		const input = document.getElementById('fileInput') as HTMLInputElement | null;
-		if (input) input.click();
 	}
 
 	function removeFile(id: string) {
@@ -274,7 +274,6 @@
 		
 		// 1. 감성 분석 트렌드 기반 예측
 		// 총 회의 수는 실제 히스토리 개수를 사용 (현재 분석 포함 시 +1 고려 가능)
-		const totalMeetings = (analysisHistory?.length || 0);
 		const currentSentiment = currentAnalysis.sentiment;
 		
 		// 전체 히스토리의 감성 분석 평균 계산
@@ -614,11 +613,8 @@
 	}
 
 	async function clearData() {
-		if (confirm('모든 데이터를 초기화하시겠습니까?\n\n⚠️ 이 작업은 다음을 삭제합니다:\n- 모든 분석 결과\n- 업로드된 파일들\n- 학습된 데이터\n- 서버에 저장된 파일들')) {
+		if (confirm('모든 데이터를 초기화하시겠습니까?')) {
 			try {
-				// 서버의 모든 분석 결과 삭제 (파일도 함께 삭제)
-				console.log('서버에서 전체 분석 결과 및 파일 삭제 중...');
-				
 				const clearAllResponse = await fetchWithTimeout('/api/analysis', {
 					method: 'DELETE'
 				});
@@ -668,7 +664,6 @@
 				
 				// 페이지 새로고침으로 완전한 초기화
 				window.location.reload();
-				
 			} catch (error) {
 				console.error('데이터 삭제 중 오류:', error);
 				const errorMessage = error instanceof Error ? error.message : '알 수 없는 오류';
@@ -709,17 +704,20 @@
 		</div>
 			
 			<div class="upload-area">
-				<input type="file" id="fileInput" multiple accept=".txt,.doc,.docx,.mp3,.wav,.mp4" on:change={handleFileUpload} />
-				<label for="fileInput" class="upload-label">
-					<div class="upload-icon">📁</div>
-					<p>파일을 선택하거나 여기에 드래그하세요</p>
-					<span class="upload-hint">지원 형식: TXT, DOC, MP3, WAV, MP4 | 파일 크기: 최대 100MB</span>
-					{#if analysisHistory.length >= 10}
-						<div class="upload-warning">
-							⚠️ 최대 10회까지 분석 가능합니다. 히스토리에서 분석 결과를 삭제한 후 다시 시도해주세요.
-			</div>
-					{/if}
-				</label>
+				{#if analysisHistory.length >= 10}
+					<div class="upload-disabled">
+						<div class="upload-icon">🚫</div>
+						<p>분석 횟수 제한에 도달했습니다</p>
+						<span class="upload-hint">최대 10회까지 분석 가능합니다. 히스토리에서 분석 결과를 삭제한 후 다시 시도해주세요.</span>
+					</div>
+				{:else}
+					<input type="file" id="fileInput" multiple accept=".txt,.doc,.docx,.mp3,.wav,.mp4" on:change={handleFileUpload} />
+					<label for="fileInput" class="upload-label">
+						<div class="upload-icon">📁</div>
+						<p>파일을 선택하거나 여기에 드래그하세요</p>
+						<span class="upload-hint">지원 형식: TXT, DOC, MP3, WAV, MP4 | 파일 크기: 최대 100MB</span>
+					</label>
+				{/if}
 		</div>
 
 			{#if uploadedFiles.length > 0}
@@ -836,8 +834,6 @@
 							{/each}
 						</ul>
 					</div>
-					
-
 				</div>
 			</section>
 
@@ -847,7 +843,6 @@
 					<h2>📚 과거 기록 기반 분석</h2>
 					<p>누적된 회의 데이터를 기반으로 한 패턴 분석 및 미래 예측</p>
 				</div>
-		
 				<div class="learned-grid">
 					<!-- 통계 요약 -->
 					<div class="learned-card stats-card">
@@ -1053,6 +1048,38 @@
 
 	.upload-area:hover {
 		border-color: #667eea;
+	}
+
+	.upload-disabled {
+		display: flex;
+		flex-direction: column;
+		align-items: center;
+		justify-content: center;
+		padding: 2rem;
+		border: 2px dashed #ccc;
+		border-radius: 12px;
+		background-color: #f8f9fa;
+		color: #6c757d;
+		text-align: center;
+		cursor: not-allowed;
+	}
+
+	.upload-disabled .upload-icon {
+		font-size: 3rem;
+		margin-bottom: 1rem;
+		opacity: 0.5;
+	}
+
+	.upload-disabled p {
+		font-size: 1.1rem;
+		font-weight: 600;
+		margin-bottom: 0.5rem;
+		color: #dc3545;
+	}
+
+	.upload-disabled .upload-hint {
+		font-size: 0.9rem;
+		color: #6c757d;
 	}
 
 	.upload-area input[type="file"] {
