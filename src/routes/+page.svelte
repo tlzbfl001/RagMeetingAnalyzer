@@ -436,13 +436,13 @@
 				
 				let analysisResponse: Response;
 				try {
-					analysisResponse = await fetchWithTimeout('/api/analyze', {
-						method: 'POST',
-						body: formData
-					}, 50000);
+				analysisResponse = await fetchWithTimeout('/api/analyze', {
+					method: 'POST',
+					body: formData
+				});
 				} catch (e) {
-					console.warn('분석 타임아웃 발생: 5초 내 응답 없음', e);
-					processingStep = '분석이 5초 안에 완료되지 않았습니다.';
+					console.warn('분석 타임아웃 발생: 5분 내 응답 없음', e);
+					processingStep = '분석이 5분 안에 완료되지 않았습니다.';
 					alert('분석 요청이 타임아웃되었습니다. 서버 처리 시간이 길 수 있습니다.');
 					isProcessing = false;
 					return;
