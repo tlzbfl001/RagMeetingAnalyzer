@@ -80,34 +80,6 @@ export async function downloadFromS3(key) {
     }
 }
 
-/**
- * S3에서 파일 삭제
- * @param {string} key - S3 키
- * @returns {Promise<void>}
- */
-export async function deleteFromS3(key) {
-    if (AWS_ENV !== 'aws' || process.env.NODE_ENV !== 'production' || !s3) {
-        // 로컬 환경에서는 로컬 파일 삭제
-        const filePath = path.join(__dirname, 'uploads', key);
-        if (fs.existsSync(filePath)) {
-            fs.unlinkSync(filePath);
-        }
-        return;
-    }
-
-    try {
-        const params = {
-            Bucket: AWS_S3_BUCKET,
-            Key: key
-        };
-
-        await s3.deleteObject(params).promise();
-        console.log(`S3 파일 삭제 성공: ${key}`);
-    } catch (error) {
-        console.error('S3 삭제 실패:', error);
-        throw error;
-    }
-}
 
 /**
  * 파일 확장자에 따른 Content-Type 반환

@@ -144,7 +144,7 @@ if (!fs.existsSync(DATA_DIR)) {
 }
 
 // 저장된 데이터 로드 함수 + uploads와 정합성 검증
-function loadSavedData() {
+async function loadSavedData() {
   try {
     // 분석 히스토리 로드
     if (fs.existsSync(HISTORY_FILE)) {
@@ -256,7 +256,7 @@ function persistData() {
 }
 
 // 서버 시작 시 저장된 데이터 로드
-loadSavedData();
+loadSavedData().catch(err => console.error('데이터 로드 실패:', err));
 
 // 학습데이터 재계산 함수 (uploads 기반 히스토리로부터)
 function recomputeLearnedData() {
@@ -973,7 +973,7 @@ app.get('/api/analysis/:id', (req, res) => {
 });
 
 // 6. 분석 결과 삭제
-app.delete('/api/analysis/:id', (req, res) => {
+app.delete('/api/analysis/:id', async (req, res) => {
   try {
     const { id } = req.params;
     const idx = analysisHistory.findIndex(h => h.id === id);
@@ -1060,9 +1060,9 @@ app.delete('/api/analysis', async (req, res) => {
 });
 
 // 수동 정합성 정리 엔드포인트 (uploads 기준으로 data 파일 갱신)
-app.post('/api/reconcile', (req, res) => {
+app.post('/api/reconcile', async (req, res) => {
   try {
-    loadSavedData();
+    await loadSavedData();
     persistData();
     return res.json({ success: true, message: '정합성 정리 완료' });
   } catch (e) {
