@@ -765,7 +765,6 @@ app.post('/api/analyze', upload.array('files', 10), async (req, res) => {
       results: analysisResults,
       message: '분석이 완료되었습니다.'
     });
-    console.timeEnd('analyze_total');
 
     // AWS 환경인 경우 파일을 S3에 업로드 (비동기, 응답 이후 처리)
     if (isAWSEnvironment()) {
