@@ -43,7 +43,7 @@
 	let analysisHistory: any[] = [];
 
 	// 지정한 시간(ms) 안에 응답이 없으면 Abort하는 유틸
-	function fetchWithTimeout(resource: string, options: RequestInit = {}, timeoutMs = 4000) {
+	function fetchWithTimeout(resource: string, options: RequestInit = {}, timeoutMs = 300000) {
 		const controller = new AbortController();
 		const id = setTimeout(() => controller.abort(), timeoutMs);
 		return fetch(resource, { ...options, signal: controller.signal })
