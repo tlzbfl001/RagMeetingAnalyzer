@@ -338,9 +338,9 @@ async function callOllama(prompt, systemPrompt = '') {
       throw new Error('Ollama 서버 연결 실패');
     }
 
-    // 타임아웃 설정 (큰 모델용으로 2분으로 증가)
+    // 타임아웃 설정 (Ollama 분석용으로 5분으로 증가)
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 120000);
+    const timeoutId = setTimeout(() => controller.abort(), 300000);
 
     const response = await fetch(`${OLLAMA_HOST}/api/generate`, {
       method: 'POST',
@@ -559,6 +559,7 @@ function fallbackAnalysis(text) {
   }).filter(Boolean);
   
   // 방법 3: "직급 이름" 패턴으로 찾기
+  const validRoles = ["대표", "부장", "사장", "부사장", "전무", "상무", "이사", "이사장", "회장", "사장대행", "고문", "자문", "본부장", "센터장", "그룹장", "실장", "팀장", "파트장", "지점장", "소장", "과장", "차장", "대리", "주임", "사원", "수석", "책임", "선임", "전임", "연구원", "주임연구원", "선임연구원", "책임연구원", "수석연구원", "박사", "석사", "학사", "전문위원", "전문가", "컨설턴트", "PM", "PO", "PL", "QA", "QC", "개발자", "엔지니어", "디자이너", "기획자", "분석가", "데이터사이언티스트", "데이터엔지니어", "ML엔지니어", "리서처", "마케터", "세일즈", "영업", "CS", "고객지원", "운영", "매니저", "코치", "트레이너", "강사", "교수", "교사", "회계사", "변호사", "변리사", "세무사", "노무사", "감사", "내부감사", "재무담당", "인사담당", "총무담당", "법무담당", "PR담당", "IR담당", "브랜드매니저", "프로덕트오너", "프로덕트매니저", "프로젝트매니저", "UX리서처", "UX디자이너", "UI디자이너", "백엔드", "프론트엔드", "풀스택", "클라우드아키텍트", "아키텍트", "SRE", "보안담당", "CISO", "CFO", "CTO", "COO", "CEO", "대표이사", "총괄", "책임자", "실무자", "담당자", "주관", "주최", "발표자", "발언자", "사회자", "진행자", "인턴", "수습", "신입", "주니어", "시니어", "리드", "헤드", "디렉터", "VP"];
   const namePattern3 = text.match(/([가-힣]+)\s+([가-힣]{2,4})/g) || [];
   const names3 = namePattern3.map(s => {
     const parts = s.split(/\s+/);
