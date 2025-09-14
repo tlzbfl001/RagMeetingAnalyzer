@@ -36,7 +36,6 @@ const uploadsDir = path.join(__dirname, 'uploads');
 const OLLAMA_HOST = process.env.OLLAMA_HOST || 'http://localhost:11434';
 const OLLAMA_MODEL = process.env.OLLAMA_MODEL || 'llama3.2:1b';
 const USE_OLLAMA = process.env.USE_OLLAMA !== 'false'; // 'false'면 Ollama 우회
-const FAST_MEDIA_MODE = process.env.FAST_MEDIA_MODE !== 'false'; // 기본 true, 'false'일 때만 비활성화
 
 // OpenAI Whisper API 설정
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
@@ -165,7 +164,6 @@ async function loadSavedData() {
     }
 
     // 파일과 정합성: 존재하지 않는 파일을 참조하는 히스토리 제거
-    // 로컬 환경: uploads 폴더 파일과 정합성 체크
     const before = analysisHistory.length;
     const validHistory = [];
     
@@ -436,6 +434,15 @@ ${text}
           const name = speaker.name || String(speaker);
           return isValidRoleName(name);
         });
+      }
+      
+      // keyPoints가 객체인 경우 배열로 변환
+      if (parsedResponse.keyPoints && !Array.isArray(parsedResponse.keyPoints)) {
+        if (typeof parsedResponse.keyPoints === 'object') {
+          parsedResponse.keyPoints = Object.values(parsedResponse.keyPoints);
+        } else {
+          parsedResponse.keyPoints = [String(parsedResponse.keyPoints)];
+        }
       }
       
       return parsedResponse;
@@ -949,17 +956,16 @@ app.delete('/api/analysis', async (req, res) => {
     // 로컬 환경: uploads 폴더 내 모든 파일 삭제
     const uploadPath = path.join(__dirname, 'uploads');
     if (fs.existsSync(uploadPath)) {
-        const files = fs.readdirSync(uploadPath);
-        files.forEach(/** @param {string} file */ file => {
-          const fullPath = path.join(uploadPath, file);
-          try {
-            const stats = fs.statSync(fullPath);
-            if (stats.isFile()) {
-              fs.unlinkSync(fullPath);
-            }
-          } catch {}
-        });
-      }
+      const files = fs.readdirSync(uploadPath);
+      files.forEach(/** @param {string} file */ file => {
+        const fullPath = path.join(uploadPath, file);
+        try {
+          const stats = fs.statSync(fullPath);
+          if (stats.isFile()) {
+            fs.unlinkSync(fullPath);
+          }
+        } catch {}
+      });
     }
     
     // 기록 완전 초기화 (파일 비우면 데이터도 비움)
@@ -986,12 +992,10 @@ app.post('/api/reconcile', async (req, res) => {
   }
 });
 
-// 파일 다운로드 엔드포인트 (S3 통합)
+// 파일 다운로드 엔드포인트 
 app.get('/api/files/:filename', async (req, res) => {
   try {
     const filename = req.params.filename;
-    
-    // 로컬 환경: 로컬 파일 시스템에서 다운로드
     const filePath = path.join(__dirname, 'uploads', filename);
     
     if (!fs.existsSync(filePath)) {
@@ -1015,7 +1019,6 @@ app.get('/api/files/:filename', async (req, res) => {
 // 미래 예측 생성 함수
 function generateFuturePredictions() {
   // 총 회의 수는 uploads 정합성 적용된 히스토리 길이를 신뢰
-  const totalMeetings = Array.isArray(analysisHistory) ? analysisHistory.length : 0;
   const avgPositive = learnedData.sentimentTrends.reduce(/** @param {any} sum @param {any} trend */ (sum, trend) => sum + trend.positive, 0) / learnedData.sentimentTrends.length;
   
   learnedData.futurePredictions = [
@@ -1040,7 +1043,6 @@ const server = app.listen(PORT, async () => {
   console.log(`📊 API 엔드포인트: http://localhost:${PORT}/api`);
   console.log(`🔍 Ollama 호스트: ${OLLAMA_HOST}`);
   console.log(`🤖 AI 모델: ${OLLAMA_MODEL}`);
-  console.log(`☁️ AWS 환경: 비활성화 (로컬 파일 시스템 사용)`);
   ensureUploadsDirectory(); // 서버 시작 시 uploads 폴더 생성
 
   // Ollama 워밍업: 콜드스타트 제거 (비차단, 실패해도 무시)
