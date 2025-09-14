@@ -670,7 +670,7 @@ app.post('/api/analyze', upload.array('files', 10), async (req, res) => {
       name: decodeURIComponent(escape(file.originalname)),
       size: file.size,
       type: file.mimetype,
-      path: file.path
+      path: path.join(uploadsDir, file.filename)
     }));
 
     uploadedFiles.push(...files);
@@ -682,7 +682,7 @@ app.post('/api/analyze', upload.array('files', 10), async (req, res) => {
         const originalName = decodeURIComponent(escape(file.originalname));
         if (file.mimetype.startsWith('text/') || originalName.endsWith('.txt')) {
           // 텍스트 파일
-          const content = fs.readFileSync(file.path, 'utf-8');
+          const content = fs.readFileSync(path.join(uploadsDir, file.filename), 'utf-8');
           extractedTexts.push(content);
         } else if (file.mimetype.startsWith('audio/') || file.mimetype.startsWith('video/') || 
                    originalName.match(/\.(mp3|wav|mp4|avi|mov)$/i)) {
@@ -694,7 +694,7 @@ app.post('/api/analyze', upload.array('files', 10), async (req, res) => {
               console.log(`⚠️ 음성 인식 실패: OpenAI API 키가 설정되지 않았습니다`);
               continue;
             }
-            const transcribedText = await transcribeAudioWithWhisper(file.path);
+            const transcribedText = await transcribeAudioWithWhisper(path.join(uploadsDir, file.filename));
             console.log(`📊 파일 정보: ${originalName}, ${(file.size / 1024 / 1024).toFixed(2)} MB, ${file.mimetype}`);
             console.log(`✅ 음성 인식 성공: ${transcribedText.length}자, ${transcribedText.split(/\s+/).length}개 단어`);
             console.log(`🔍 인식된 내용:\n${transcribedText}`);
@@ -777,8 +777,9 @@ app.post('/api/analyze', upload.array('files', 10), async (req, res) => {
     // 오류 발생 시 업로드된 파일 정리
     uploadedFiles.forEach(file => {
       try {
-        if (fs.existsSync(file.path)) {
-          fs.unlinkSync(file.path);
+        const filePath = path.join(uploadsDir, file.filename);
+        if (fs.existsSync(filePath)) {
+          fs.unlinkSync(filePath);
         }
       } catch (deleteError) {
         console.error('오류 후 파일 정리 실패:', deleteError);
