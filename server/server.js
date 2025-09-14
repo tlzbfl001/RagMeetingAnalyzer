@@ -6,7 +6,7 @@ import multer from 'multer';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import fs from 'fs';
-import { uploadToS3, downloadFromS3, isAWSEnvironment, deleteFromS3, deleteMultipleFromS3, listS3Files, existsInS3 } from './s3Utils.js';
+// S3 관련 import 제거
 
 // 환경변수 로드
 dotenv.config();
@@ -70,11 +70,7 @@ app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 // 파일 업로드 설정
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
-    if (isAWSEnvironment()) {
-      cb(null, '/opt/rag-system/server/uploads/');
-    } else {
-      cb(null, 'uploads/');
-    }
+    cb(null, 'uploads/');
   },
   filename: (req, file, cb) => {
     const originalName = decodeURIComponent(escape(file.originalname));
@@ -169,66 +165,40 @@ async function loadSavedData() {
     }
 
     // 파일과 정합성: 존재하지 않는 파일을 참조하는 히스토리 제거
-    if (isAWSEnvironment()) {
-      // AWS 환경: S3 파일과 정합성 체크
-      const before = analysisHistory.length;
-      const validHistory = [];
-      
-      for (const h of analysisHistory) {
-        try {
-          if (!h.files || !Array.isArray(h.files) || h.files.length === 0) continue;
-          
-          // 히스토리의 모든 파일이 S3에 존재하는지 확인
-          let allFilesExist = true;
-          for (const f of h.files) {
-            const s3Key = f.serverFilename ? `${h.id}/${f.serverFilename}` : `${h.id}/${f.name}`;
-            const exists = await existsInS3(s3Key);
-            if (!exists) {
-              allFilesExist = false;
-              break;
-            }
+    // 로컬 환경: uploads 폴더 파일과 정합성 체크
+    const before = analysisHistory.length;
+    const validHistory = [];
+    
+    for (const h of analysisHistory) {
+      try {
+        if (!h.files || !Array.isArray(h.files) || h.files.length === 0) continue;
+        
+        // 로컬 파일 시스템에서 파일 존재 확인
+        let allFilesExist = true;
+        for (const f of h.files) {
+          const filePath = path.join(__dirname, 'uploads', f.serverFilename || f.name);
+          if (!fs.existsSync(filePath)) {
+            allFilesExist = false;
+            break;
           }
-          
-          if (allFilesExist) {
-            validHistory.push(h);
-          }
-        } catch { continue; }
-      }
-      
-      analysisHistory = validHistory;
-      if (before !== analysisHistory.length) {
-        console.log(`S3 정합성 정리: ${before - analysisHistory.length}개 히스토리 제거`);
-      }
-      
-      // S3에 파일이 없으면 히스토리 초기화
-      const s3Files = await listS3Files();
-      if (s3Files.length === 0 && analysisHistory.length > 0) {
-        analysisHistory = [];
-        console.log('S3 비어있음: 히스토리 초기화');
-      }
-    } else {
-      // 로컬 환경: uploads 폴더와 정합성 체크
-      const uploadPath = path.join(__dirname, 'uploads');
-      if (fs.existsSync(uploadPath)) {
-        const fileSet = new Set(fs.readdirSync(uploadPath));
-        const before = analysisHistory.length;
-        analysisHistory = analysisHistory.filter(h => {
-          try {
-            if (!h.files || !Array.isArray(h.files) || h.files.length === 0) return false;
-            // 히스토리의 모든 파일이 uploads에 존재해야 유효
-            return h.files.every(f => f.serverFilename ? fileSet.has(f.serverFilename) : fileSet.has(f.name));
-          } catch { return false; }
-        });
-        if (before !== analysisHistory.length) {
-          console.log(`로컬 정합성 정리: ${before - analysisHistory.length}개 히스토리 제거`);
         }
-      } else {
-        // uploads 폴더가 없거나 비어있으면 히스토리 초기화
-        if (analysisHistory.length > 0) {
-          analysisHistory = [];
-          console.log('uploads 비어있음: 히스토리 초기화');
+        
+        if (allFilesExist) {
+          validHistory.push(h);
         }
-      }
+      } catch { continue; }
+    }
+    
+    analysisHistory = validHistory;
+    if (before !== analysisHistory.length) {
+      console.log(`파일 정합성 정리: ${before - analysisHistory.length}개 히스토리 제거`);
+    }
+    
+    // uploads 폴더에 파일이 없으면 히스토리 초기화
+    const uploadsFiles = fs.readdirSync(uploadsDir);
+    if (uploadsFiles.length === 0 && analysisHistory.length > 0) {
+      analysisHistory = [];
+      console.log('uploads 폴더 비어있음: 히스토리 초기화');
     }
 
     // learnedData 재계산 및 영속화
@@ -771,26 +741,7 @@ app.post('/api/analyze', upload.array('files', 10), async (req, res) => {
       message: '분석이 완료되었습니다.'
     });
 
-    // AWS 환경인 경우 파일을 S3에 업로드 (비동기, 응답 이후 처리)
-    if (isAWSEnvironment()) {
-      (async () => {
-        for (const file of files) {
-          try {
-            const s3Key = `${analysisId}/${file.name}`;
-            await uploadToS3(file.path, s3Key);
-            console.log(`S3 업로드 완료: ${file.name}`);
-
-            // 로컬 임시 파일 삭제
-            if (fs.existsSync(file.path)) {
-              fs.unlinkSync(file.path);
-              console.log(`로컬 임시 파일 삭제: ${file.path}`);
-            }
-          } catch (s3Error) {
-            console.error(`S3 업로드 실패 (${file.name}):`, s3Error);
-          }
-        }
-      })().catch(err => console.error('백그라운드 S3 업로드 작업 오류:', err));
-    }
+    // 파일은 로컬 uploads 폴더에 유지
 
     // 히스토리에 저장 (uploads 파일 기반)
     try {
@@ -839,34 +790,10 @@ app.get('/api/history', async (req, res) => {
   try {
     let filtered = [];
     
-    if (isAWSEnvironment()) {
-      // AWS 환경: S3 파일 존재 여부로 필터링
-      for (const h of analysisHistory) {
-        try {
-          if (!h.files || !Array.isArray(h.files) || h.files.length === 0) continue;
-          
-          // 히스토리의 모든 파일이 S3에 존재하는지 확인
-          let allFilesExist = true;
-          for (const f of h.files) {
-            const s3Key = f.serverFilename ? `${h.id}/${f.serverFilename}` : `${h.id}/${f.name}`;
-            const exists = await existsInS3(s3Key);
-            if (!exists) {
-              allFilesExist = false;
-              break;
-            }
-          }
-          
-          if (allFilesExist) {
-            filtered.push(h);
-          }
-        } catch { continue; }
-      }
-    } else {
-      // 로컬 환경: uploads 폴더 파일 존재 여부로 필터링
-      const uploadPath = path.join(__dirname, 'uploads');
-      const fileSet = fs.existsSync(uploadPath) ? new Set(fs.readdirSync(uploadPath)) : new Set();
-      filtered = analysisHistory.filter(h => h.files?.every(f => f.serverFilename ? fileSet.has(f.serverFilename) : fileSet.has(f.name)));
-    }
+    // 로컬 환경: uploads 폴더 파일 존재 여부로 필터링
+    const uploadPath = path.join(__dirname, 'uploads');
+    const fileSet = fs.existsSync(uploadPath) ? new Set(fs.readdirSync(uploadPath)) : new Set();
+    filtered = analysisHistory.filter(h => h.files?.every(f => f.serverFilename ? fileSet.has(f.serverFilename) : fileSet.has(f.name)));
     
     res.json({ success: true, data: filtered, total: filtered.length });
   } catch (error) {
@@ -990,23 +917,15 @@ app.delete('/api/analysis/:id', async (req, res) => {
     try {
       const files = analysisHistory[idx].files || [];
       
-      if (isAWSEnvironment()) {
-        // AWS 환경: S3에서 파일 삭제
-        for (const f of files) {
-          const s3Key = f.serverFilename ? `${analysisHistory[idx].id}/${f.serverFilename}` : `${analysisHistory[idx].id}/${f.name}`;
-          await deleteFromS3(s3Key);
-        }
-      } else {
-        // 로컬 환경: uploads 폴더에서 파일 삭제
-        const uploadPath = path.join(__dirname, 'uploads');
-        for (const f of files) {
-          const candidate = f.serverFilename ? path.join(uploadPath, f.serverFilename) : path.join(uploadPath, f.name);
-          try {
-            if (fs.existsSync(candidate) && fs.statSync(candidate).isFile()) {
-              fs.unlinkSync(candidate);
-            }
-          } catch {}
-        }
+      // 로컬 환경: uploads 폴더에서 파일 삭제
+      const uploadPath = path.join(__dirname, 'uploads');
+      for (const f of files) {
+        const candidate = f.serverFilename ? path.join(uploadPath, f.serverFilename) : path.join(uploadPath, f.name);
+        try {
+          if (fs.existsSync(candidate) && fs.statSync(candidate).isFile()) {
+            fs.unlinkSync(candidate);
+          }
+        } catch {}
       }
     } catch {}
 
@@ -1027,16 +946,9 @@ app.delete('/api/analysis/:id', async (req, res) => {
 // 7. 모든 분석 결과 삭제 (전체 초기화)
 app.delete('/api/analysis', async (req, res) => {
   try {
-    if (isAWSEnvironment()) {
-      // AWS 환경: S3의 모든 파일 삭제
-      const s3Files = await listS3Files();
-      if (s3Files.length > 0) {
-        await deleteMultipleFromS3(s3Files);
-      }
-    } else {
-      // 로컬 환경: uploads 폴더 내 모든 파일 삭제
-      const uploadPath = path.join(__dirname, 'uploads');
-      if (fs.existsSync(uploadPath)) {
+    // 로컬 환경: uploads 폴더 내 모든 파일 삭제
+    const uploadPath = path.join(__dirname, 'uploads');
+    if (fs.existsSync(uploadPath)) {
         const files = fs.readdirSync(uploadPath);
         files.forEach(/** @param {string} file */ file => {
           const fullPath = path.join(uploadPath, file);
@@ -1055,7 +967,7 @@ app.delete('/api/analysis', async (req, res) => {
     learnedData = { totalMeetings: 0, commonKeywords: [], speakerPatterns: [], sentimentTrends: [], futurePredictions: [] };
     persistData();
     
-    const message = isAWSEnvironment() ? 'S3와 데이터 기록을 모두 정리했습니다.' : 'uploads와 데이터 기록을 모두 정리했습니다.';
+    const message = 'uploads와 데이터 기록을 모두 정리했습니다.';
     return res.json({ success: true, message });
   } catch (error) {
     console.error('파일 삭제 중 오류:', error);
@@ -1079,37 +991,19 @@ app.get('/api/files/:filename', async (req, res) => {
   try {
     const filename = req.params.filename;
     
-    if (isAWSEnvironment()) {
-      // AWS 환경: S3에서 파일 다운로드
-      try {
-        const fileData = await downloadFromS3(filename);
-        res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
-        res.setHeader('Content-Type', 'application/octet-stream');
-        res.send(fileData);
-      } catch (s3Error) {
-        console.error('S3 파일 다운로드 실패:', s3Error);
-        res.status(404).json({ error: 'S3에서 파일을 찾을 수 없습니다.' });
-      }
-    } else {
-      // 로컬 환경: 로컬 파일 시스템에서 다운로드
-      let filePath;
-      if (isAWSEnvironment()) {
-        filePath = '/opt/rag-system/server/uploads/' + filename;
-      } else {
-        filePath = path.join(__dirname, 'uploads', filename);
-      }
-      
-      if (!fs.existsSync(filePath)) {
-        return res.status(404).json({ error: '파일을 찾을 수 없습니다.' });
-      }
-      
-      res.download(filePath, filename, (err) => {
-        if (err) {
-          console.error('파일 다운로드 오류:', err);
-          res.status(500).json({ error: '파일 다운로드 중 오류가 발생했습니다.' });
-        }
-      });
+    // 로컬 환경: 로컬 파일 시스템에서 다운로드
+    const filePath = path.join(__dirname, 'uploads', filename);
+    
+    if (!fs.existsSync(filePath)) {
+      return res.status(404).json({ error: '파일을 찾을 수 없습니다.' });
     }
+    
+    res.download(filePath, filename, (err) => {
+      if (err) {
+        console.error('파일 다운로드 오류:', err);
+        res.status(500).json({ error: '파일 다운로드 중 오류가 발생했습니다.' });
+      }
+    });
   } catch (error) {
     console.error('파일 다운로드 처리 오류:', error);
     res.status(500).json({ error: '파일 다운로드 처리 중 오류가 발생했습니다.' });
@@ -1146,11 +1040,7 @@ const server = app.listen(PORT, async () => {
   console.log(`📊 API 엔드포인트: http://localhost:${PORT}/api`);
   console.log(`🔍 Ollama 호스트: ${OLLAMA_HOST}`);
   console.log(`🤖 AI 모델: ${OLLAMA_MODEL}`);
-  console.log(`☁️ AWS 환경: ${isAWSEnvironment() ? '활성화 (S3 사용)' : '비활성화 (로컬 파일 시스템 사용)'}`);
-  if (isAWSEnvironment()) {
-    console.log(`📦 S3 버킷: ${process.env.AWS_S3_BUCKET}`);
-    console.log(`🌍 AWS 리전: ${process.env.AWS_REGION}`);
-  }
+  console.log(`☁️ AWS 환경: 비활성화 (로컬 파일 시스템 사용)`);
   ensureUploadsDirectory(); // 서버 시작 시 uploads 폴더 생성
 
   // Ollama 워밍업: 콜드스타트 제거 (비차단, 실패해도 무시)
