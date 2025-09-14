@@ -70,7 +70,11 @@ app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 // 파일 업로드 설정
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
-    cb(null, 'uploads/');
+    if (isAWSEnvironment()) {
+      cb(null, '/opt/rag-system/server/uploads/');
+    } else {
+      cb(null, 'uploads/');
+    }
   },
   filename: (req, file, cb) => {
     const originalName = decodeURIComponent(escape(file.originalname));
@@ -1088,7 +1092,12 @@ app.get('/api/files/:filename', async (req, res) => {
       }
     } else {
       // 로컬 환경: 로컬 파일 시스템에서 다운로드
-      const filePath = path.join(__dirname, 'uploads', filename);
+      let filePath;
+      if (isAWSEnvironment()) {
+        filePath = '/opt/rag-system/server/uploads/' + filename;
+      } else {
+        filePath = path.join(__dirname, 'uploads', filename);
+      }
       
       if (!fs.existsSync(filePath)) {
         return res.status(404).json({ error: '파일을 찾을 수 없습니다.' });
