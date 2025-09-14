@@ -1,17 +1,65 @@
 {
-  "totalMeetings": 3,
+  "totalMeetings": 9,
   "commonKeywords": [
     {
       "word": "키워드",
-      "count": 8
+      "count": 13
+    },
+    {
+      "word": "국회법사위",
+      "count": 10
+    },
+    {
+      "word": "자격",
+      "count": 5
+    },
+    {
+      "word": "팀 성과 평가",
+      "count": 3
+    },
+    {
+      "word": " 발언 방해",
+      "count": 3
+    },
+    {
+      "word": "발언",
+      "count": 3
     },
     {
       "word": "개선",
       "count": 3
     },
     {
+      "word": "개선 방안",
+      "count": 2
+    },
+    {
+      "word": " 의원 발언",
+      "count": 2
+    },
+    {
+      "word": "team",
+      "count": 2
+    },
+    {
       "word": "팀성과",
       "count": 2
+    },
+    {
+      "word": "업무 프로세스",
+      "count": 1
+    },
+    {
+      "word": "국회법",
+      "count": 1
+    },
+    {
+      "word": "performance",
+      "count": 1
+    },
+    {
+      "word": "evaluation",
+      "count": 1
     },
     {
       "word": "방안",
@@ -24,6 +72,42 @@
   ],
   "speakerPatterns": [],
   "sentimentTrends": [
+    {
+      "date": "2025-09-11T09:17:11.651Z",
+      "positive": 0.7,
+      "negative": 0.2,
+      "neutral": 0.1
+    },
+    {
+      "date": "2025-09-11T07:50:24.353Z",
+      "positive": 0,
+      "negative": 0,
+      "neutral": 50
+    },
+    {
+      "date": "2025-09-11T07:17:36.741Z",
+      "positive": 0.9,
+      "negative": 0.1,
+      "neutral": 0
+    },
+    {
+      "date": "2025-09-11T07:17:18.775Z",
+      "positive": 0.9,
+      "negative": 0.05,
+      "neutral": 0.05
+    },
+    {
+      "date": "2025-09-11T07:16:17.124Z",
+      "positive": 0.4,
+      "negative": 0.5,
+      "neutral": 0.1
+    },
+    {
+      "date": "2025-09-11T06:46:49.978Z",
+      "positive": 0.9,
+      "negative": 0.1,
+      "neutral": 0
+    },
     {
       "date": "2025-09-10T13:35:31.789Z",
       "positive": 0.85,
