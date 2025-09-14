@@ -69,7 +69,7 @@ app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 // 파일 업로드 설정
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
-    cb(null, 'uploads/');
+    cb(null, uploadsDir);
   },
   filename: (req, file, cb) => {
     const originalName = decodeURIComponent(escape(file.originalname));
@@ -925,9 +925,8 @@ app.delete('/api/analysis/:id', async (req, res) => {
       const files = analysisHistory[idx].files || [];
       
       // 로컬 환경: uploads 폴더에서 파일 삭제
-      const uploadPath = path.join(__dirname, 'uploads');
       for (const f of files) {
-        const candidate = f.serverFilename ? path.join(uploadPath, f.serverFilename) : path.join(uploadPath, f.name);
+        const candidate = f.serverFilename ? path.join(uploadsDir, f.serverFilename) : path.join(uploadsDir, f.name);
         try {
           if (fs.existsSync(candidate) && fs.statSync(candidate).isFile()) {
             fs.unlinkSync(candidate);
@@ -954,11 +953,10 @@ app.delete('/api/analysis/:id', async (req, res) => {
 app.delete('/api/analysis', async (req, res) => {
   try {
     // 로컬 환경: uploads 폴더 내 모든 파일 삭제
-    const uploadPath = path.join(__dirname, 'uploads');
-    if (fs.existsSync(uploadPath)) {
-      const files = fs.readdirSync(uploadPath);
+    if (fs.existsSync(uploadsDir)) {
+      const files = fs.readdirSync(uploadsDir);
       files.forEach(/** @param {string} file */ file => {
-        const fullPath = path.join(uploadPath, file);
+        const fullPath = path.join(uploadsDir, file);
         try {
           const stats = fs.statSync(fullPath);
           if (stats.isFile()) {
@@ -996,7 +994,7 @@ app.post('/api/reconcile', async (req, res) => {
 app.get('/api/files/:filename', async (req, res) => {
   try {
     const filename = req.params.filename;
-    const filePath = path.join(__dirname, 'uploads', filename);
+    const filePath = path.join(uploadsDir, filename);
     
     if (!fs.existsSync(filePath)) {
       return res.status(404).json({ error: '파일을 찾을 수 없습니다.' });
