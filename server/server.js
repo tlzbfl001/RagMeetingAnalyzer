@@ -73,7 +73,7 @@ if (process.env.NODE_ENV === 'production') {
   
   // SPA 라우팅을 위한 fallback - 실제 SvelteKit 앱 서빙
   app.get('*', (req, res) => {
-    // SvelteKit 앱의 실제 HTML 템플릿 (실제 파일명 사용)
+    // SvelteKit의 기본 HTML 템플릿 사용
     const html = `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -86,46 +86,10 @@ if (process.env.NODE_ENV === 'production') {
   <link rel="stylesheet" href="/_app/immutable/assets/0.CU-iK7J7.css">
   <link rel="stylesheet" href="/_app/immutable/assets/2.CE1HdMtk.css">
   <link rel="stylesheet" href="/_app/immutable/assets/3.D86D8tp2.css">
-  <style>
-    body { 
-      font-family: Arial, sans-serif; 
-      margin: 0; 
-      padding: 20px; 
-      background: #f5f5f5; 
-    }
-    .loading { 
-      text-align: center; 
-      color: #666; 
-      margin-top: 50px; 
-    }
-  </style>
 </head>
 <body>
-  <div class="loading">RAG 시스템 로딩 중...</div>
   <div id="app"></div>
   <script type="module" data-sveltekit-hydrate="1" src="/_app/immutable/entry/start.FMMiBREL.js"></script>
-  <script>
-    // 디버깅용 스크립트
-    console.log('HTML 로드됨');
-    console.log('SvelteKit hydration 시작...');
-    
-    // SvelteKit이 로드되었는지 확인
-    window.addEventListener('load', () => {
-      console.log('페이지 로드 완료');
-      setTimeout(() => {
-        const app = document.getElementById('app');
-        console.log('App element:', app);
-        console.log('App innerHTML:', app.innerHTML);
-        
-        if (app && app.innerHTML.trim() === '') {
-          console.log('SvelteKit 앱이 로드되지 않음');
-          app.innerHTML = '<div style="text-align: center; margin-top: 50px; color: #666;">SvelteKit 앱 로딩 중...<br><small>JavaScript가 로드되지 않았을 수 있습니다.</small></div>';
-        } else {
-          console.log('SvelteKit 앱이 정상적으로 로드됨');
-        }
-      }, 5000);
-    });
-  </script>
 </body>
 </html>`;
     res.send(html);
