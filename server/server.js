@@ -74,38 +74,38 @@ if (process.env.NODE_ENV === 'production') {
   // SPA 라우팅을 위한 fallback - 실제 SvelteKit 앱 서빙
   app.get('*', (req, res) => {
     // 실제 빌드된 파일명을 동적으로 찾기
-    const fs = require('fs');
-    const entryPath = path.join(__dirname, '..', '.svelte-kit/output/client/_app/immutable/entry');
-    const assetsPath = path.join(__dirname, '..', '.svelte-kit/output/client/_app/immutable/assets');
+    import('fs').then(fs => {
+      const entryPath = path.join(__dirname, '..', '.svelte-kit/output/client/_app/immutable/entry');
+      const assetsPath = path.join(__dirname, '..', '.svelte-kit/output/client/_app/immutable/assets');
     
-    let startFile = '';
-    let appFile = '';
-    let cssFiles = [];
-    
-    try {
-      // entry 파일들 찾기
-      if (fs.existsSync(entryPath)) {
-        const entryFiles = fs.readdirSync(entryPath);
-        startFile = entryFiles.find(f => f.startsWith('start.') && f.endsWith('.js'));
-        appFile = entryFiles.find(f => f.startsWith('app.') && f.endsWith('.js'));
+      let startFile = '';
+      let appFile = '';
+      let cssFiles = [];
+      
+      try {
+        // entry 파일들 찾기
+        if (fs.existsSync(entryPath)) {
+          const entryFiles = fs.readdirSync(entryPath);
+          startFile = entryFiles.find(f => f.startsWith('start.') && f.endsWith('.js'));
+          appFile = entryFiles.find(f => f.startsWith('app.') && f.endsWith('.js'));
+        }
+        
+        // assets 파일들 찾기
+        if (fs.existsSync(assetsPath)) {
+          const assetFiles = fs.readdirSync(assetsPath);
+          cssFiles = assetFiles.filter(f => f.endsWith('.css'));
+        }
+      } catch (error) {
+        console.error('파일 찾기 오류:', error);
       }
       
-      // assets 파일들 찾기
-      if (fs.existsSync(assetsPath)) {
-        const assetFiles = fs.readdirSync(assetsPath);
-        cssFiles = assetFiles.filter(f => f.endsWith('.css'));
-      }
-    } catch (error) {
-      console.error('파일 찾기 오류:', error);
-    }
-    
-    // CSS 링크 생성
-    const cssLinks = cssFiles.map(css => 
-      `<link rel="stylesheet" href="/_app/immutable/assets/${css}">`
-    ).join('\n  ');
-    
-    // SvelteKit의 기본 HTML 템플릿 사용
-    const html = `<!DOCTYPE html>
+      // CSS 링크 생성
+      const cssLinks = cssFiles.map(css => 
+        `<link rel="stylesheet" href="/_app/immutable/assets/${css}">`
+      ).join('\n  ');
+      
+      // SvelteKit의 기본 HTML 템플릿 사용
+      const html = `<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="utf-8" />
@@ -121,7 +121,25 @@ if (process.env.NODE_ENV === 'production') {
   ${startFile ? `<script type="module" data-sveltekit-hydrate="1" src="/_app/immutable/entry/${startFile}"></script>` : ''}
 </body>
 </html>`;
-    res.send(html);
+      res.send(html);
+    }).catch(error => {
+      console.error('fs 모듈 로드 오류:', error);
+      // 기본 HTML 응답
+      const html = `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <link rel="icon" href="/favicon.ico" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>RAG 기반 회의 분석 시스템</title>
+</head>
+<body>
+  <div id="app"></div>
+  <script>console.error('파일 시스템 오류로 인해 앱을 로드할 수 없습니다.');</script>
+</body>
+</html>`;
+      res.send(html);
+    });
   });
 }
 
