@@ -71,13 +71,10 @@ if (process.env.NODE_ENV === 'production') {
   const buildPath = path.join(__dirname, '..', '.svelte-kit/output/client');
   app.use(express.static(buildPath));
   
-  // SPA 라우팅을 위한 fallback - SvelteKit 구조에 맞게 수정
+  // SPA 라우팅을 위한 fallback - 간단한 HTML 템플릿
   app.get('*', (req, res) => {
-    // SvelteKit의 경우 _app 폴더 구조를 고려
-    const indexPath = path.join(buildPath, '_app', 'immutable', 'entry', 'start.js');
-    if (fs.existsSync(indexPath)) {
-      // SvelteKit 앱의 경우 HTML 템플릿 생성
-      const html = `
+    // 기본 HTML 템플릿 생성
+    const html = `
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -85,16 +82,32 @@ if (process.env.NODE_ENV === 'production') {
   <link rel="icon" href="/favicon.ico" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>RAG 기반 회의 분석 시스템</title>
+  <style>
+    body { font-family: Arial, sans-serif; margin: 0; padding: 20px; }
+    .container { max-width: 800px; margin: 0 auto; }
+    .header { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 2rem; border-radius: 10px; text-align: center; margin-bottom: 2rem; }
+    .content { background: white; padding: 2rem; border-radius: 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
+  </style>
 </head>
 <body>
-  <div id="app"></div>
-  <script type="module" src="/_app/immutable/entry/start.js"></script>
+  <div class="container">
+    <div class="header">
+      <h1>🚀 RAG 기반 회의 분석 시스템</h1>
+      <p>AI 학습을 통한 지능형 회의 요약 및 미래 예측 플랫폼</p>
+    </div>
+    <div class="content">
+      <h2>시스템이 시작 중입니다...</h2>
+      <p>잠시 후 페이지가 새로고침됩니다.</p>
+      <script>
+        setTimeout(() => {
+          window.location.reload();
+        }, 2000);
+      </script>
+    </div>
+  </div>
 </body>
 </html>`;
-      res.send(html);
-    } else {
-      res.status(404).send('Not Found');
-    }
+    res.send(html);
   });
 }
 
