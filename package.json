@@ -3,7 +3,7 @@
 	"version": "0.0.1",
 	"private": true,
 	"scripts": {
-		"build": "vite build",
+		"build": "svelte-kit build",
 		"dev": "vite dev",
 		"preview": "vite preview",
 		"check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
@@ -17,7 +17,7 @@
 		"server:build:lambda": "esbuild server/src/handler.ts --bundle --platform=node --format=esm --outfile=dist/handler.mjs"
 	},
 	"devDependencies": {
-		"@sveltejs/adapter-node": "^5.0.0",
+		"@sveltejs/adapter-static": "^3.0.0",
 		"@sveltejs/adapter-auto": "^3.0.0",
 		"@sveltejs/kit": "^2.0.0",
 		"@sveltejs/vite-plugin-svelte": "^3.0.0",
