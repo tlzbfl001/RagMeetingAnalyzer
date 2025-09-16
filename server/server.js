@@ -73,6 +73,37 @@ if (process.env.NODE_ENV === 'production') {
   
   // SPA 라우팅을 위한 fallback - 실제 SvelteKit 앱 서빙
   app.get('*', (req, res) => {
+    // 실제 빌드된 파일명을 동적으로 찾기
+    const fs = require('fs');
+    const entryPath = path.join(__dirname, '..', '.svelte-kit/output/client/_app/immutable/entry');
+    const assetsPath = path.join(__dirname, '..', '.svelte-kit/output/client/_app/immutable/assets');
+    
+    let startFile = '';
+    let appFile = '';
+    let cssFiles = [];
+    
+    try {
+      // entry 파일들 찾기
+      if (fs.existsSync(entryPath)) {
+        const entryFiles = fs.readdirSync(entryPath);
+        startFile = entryFiles.find(f => f.startsWith('start.') && f.endsWith('.js'));
+        appFile = entryFiles.find(f => f.startsWith('app.') && f.endsWith('.js'));
+      }
+      
+      // assets 파일들 찾기
+      if (fs.existsSync(assetsPath)) {
+        const assetFiles = fs.readdirSync(assetsPath);
+        cssFiles = assetFiles.filter(f => f.endsWith('.css'));
+      }
+    } catch (error) {
+      console.error('파일 찾기 오류:', error);
+    }
+    
+    // CSS 링크 생성
+    const cssLinks = cssFiles.map(css => 
+      `<link rel="stylesheet" href="/_app/immutable/assets/${css}">`
+    ).join('\n  ');
+    
     // SvelteKit의 기본 HTML 템플릿 사용
     const html = `<!DOCTYPE html>
 <html lang="en">
@@ -81,15 +112,13 @@ if (process.env.NODE_ENV === 'production') {
   <link rel="icon" href="/favicon.ico" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>RAG 기반 회의 분석 시스템</title>
-  <link rel="modulepreload" href="/_app/immutable/entry/start.FMMiBREL.js">
-  <link rel="modulepreload" href="/_app/immutable/entry/app.Uf2lVIyZ.js">
-  <link rel="stylesheet" href="/_app/immutable/assets/0.CU-iK7J7.css">
-  <link rel="stylesheet" href="/_app/immutable/assets/2.CE1HdMtk.css">
-  <link rel="stylesheet" href="/_app/immutable/assets/3.D86D8tp2.css">
+  ${startFile ? `<link rel="modulepreload" href="/_app/immutable/entry/${startFile}">` : ''}
+  ${appFile ? `<link rel="modulepreload" href="/_app/immutable/entry/${appFile}">` : ''}
+  ${cssLinks}
 </head>
 <body>
   <div id="app"></div>
-  <script type="module" data-sveltekit-hydrate="1" src="/_app/immutable/entry/start.FMMiBREL.js"></script>
+  ${startFile ? `<script type="module" data-sveltekit-hydrate="1" src="/_app/immutable/entry/${startFile}"></script>` : ''}
 </body>
 </html>`;
     res.send(html);
