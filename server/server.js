@@ -68,7 +68,7 @@ app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
 // SvelteKit 빌드된 정적 파일 서빙 (프로덕션 환경)
 if (process.env.NODE_ENV === 'production') {
-  const buildPath = path.join(__dirname, '..', 'build');
+  const buildPath = path.join(__dirname, '..', '.svelte-kit/output/client');
   app.use(express.static(buildPath));
   
   // SPA 라우팅을 위한 fallback
