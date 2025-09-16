@@ -71,9 +71,30 @@ if (process.env.NODE_ENV === 'production') {
   const buildPath = path.join(__dirname, '..', '.svelte-kit/output/client');
   app.use(express.static(buildPath));
   
-  // SPA 라우팅을 위한 fallback
+  // SPA 라우팅을 위한 fallback - SvelteKit 구조에 맞게 수정
   app.get('*', (req, res) => {
-    res.sendFile(path.join(buildPath, 'index.html'));
+    // SvelteKit의 경우 _app 폴더 구조를 고려
+    const indexPath = path.join(buildPath, '_app', 'immutable', 'entry', 'start.js');
+    if (fs.existsSync(indexPath)) {
+      // SvelteKit 앱의 경우 HTML 템플릿 생성
+      const html = `
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <link rel="icon" href="/favicon.ico" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>RAG 기반 회의 분석 시스템</title>
+</head>
+<body>
+  <div id="app"></div>
+  <script type="module" src="/_app/immutable/entry/start.js"></script>
+</body>
+</html>`;
+      res.send(html);
+    } else {
+      res.status(404).send('Not Found');
+    }
   });
 }
 
