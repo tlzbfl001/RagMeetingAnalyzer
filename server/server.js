@@ -71,40 +71,28 @@ if (process.env.NODE_ENV === 'production') {
   const buildPath = path.join(__dirname, '..', '.svelte-kit/output/client');
   app.use(express.static(buildPath));
   
-  // SPA 라우팅을 위한 fallback - 간단한 HTML 템플릿
+  // SPA 라우팅을 위한 fallback - 실제 SvelteKit 앱 서빙
   app.get('*', (req, res) => {
-    // 기본 HTML 템플릿 생성
-    const html = `
-<!DOCTYPE html>
+    // SvelteKit 앱의 실제 HTML 템플릿
+    const html = `<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="utf-8" />
   <link rel="icon" href="/favicon.ico" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>RAG 기반 회의 분석 시스템</title>
-  <style>
-    body { font-family: Arial, sans-serif; margin: 0; padding: 20px; }
-    .container { max-width: 800px; margin: 0 auto; }
-    .header { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 2rem; border-radius: 10px; text-align: center; margin-bottom: 2rem; }
-    .content { background: white; padding: 2rem; border-radius: 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
-  </style>
+  <link rel="modulepreload" href="/_app/immutable/entry/start.js">
+  <link rel="modulepreload" href="/_app/immutable/chunks/index.js">
+  <link rel="modulepreload" href="/_app/immutable/chunks/singletons.js">
+  <link rel="modulepreload" href="/_app/immutable/chunks/paths.js">
+  <link rel="modulepreload" href="/_app/immutable/chunks/scheduler.js">
+  <link rel="modulepreload" href="/_app/immutable/chunks/singletons.js">
+  <link rel="modulepreload" href="/_app/immutable/entry/app.js">
+  <link rel="stylesheet" href="/_app/immutable/assets/0.css">
 </head>
 <body>
-  <div class="container">
-    <div class="header">
-      <h1>🚀 RAG 기반 회의 분석 시스템</h1>
-      <p>AI 학습을 통한 지능형 회의 요약 및 미래 예측 플랫폼</p>
-    </div>
-    <div class="content">
-      <h2>시스템이 시작 중입니다...</h2>
-      <p>잠시 후 페이지가 새로고침됩니다.</p>
-      <script>
-        setTimeout(() => {
-          window.location.reload();
-        }, 2000);
-      </script>
-    </div>
-  </div>
+  <div id="app"></div>
+  <script type="module" data-sveltekit-hydrate="1" src="/_app/immutable/entry/start.js"></script>
 </body>
 </html>`;
     res.send(html);
