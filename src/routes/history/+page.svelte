@@ -312,7 +312,7 @@
 				<div class="empty-icon">📁</div>
 				<h3>아직 분석 히스토리가 없습니다</h3>
 				<p>메인 페이지에서 파일을 업로드하고 분석해보세요!</p>
-				<a href="/" class="btn-primary">메인으로 이동</a>
+				<a href="{base}/" class="btn-primary">메인으로 이동</a>
 			</div>
 		{:else}
 			<!-- 히스토리 목록 -->
