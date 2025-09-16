@@ -1,10 +1,12 @@
 import { vitePreprocess } from '@sveltejs/vite-plugin-svelte';
 
+const isProd = process.env.NODE_ENV === 'production';
+
 const config = {
 	preprocess: vitePreprocess(),
 	kit: {
-		// base 경로 제거 - nginx에서 프록시 처리
-		paths: { base: '' }
+		// 프로덕션에서만 /rag-system 적용, 로컬(dev)은 빈 값
+		paths: { base: isProd ? '/rag-system' : '' }
 	}
 };
 

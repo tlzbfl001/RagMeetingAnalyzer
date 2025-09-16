@@ -71,23 +71,43 @@ if (process.env.NODE_ENV === 'production') {
   const buildPath = path.join(__dirname, '..', '.svelte-kit/output/client');
   app.use(express.static(buildPath));
   
-  // SPA 라우팅을 위한 fallback - 간단한 HTML 템플릿
+  // SPA 라우팅을 위한 fallback - 실제 빌드 파일명 사용(상대경로)
   app.get('*', (req, res) => {
-    // 간단한 HTML 템플릿 - SvelteKit이 자동으로 처리하도록
-    const html = `<!DOCTYPE html>
+    try {
+      const entryPath = path.join(buildPath, '_app/immutable/entry');
+      const assetsPath = path.join(buildPath, '_app/immutable/assets');
+
+      const entryFiles = fs.readdirSync(entryPath);
+      const startFile = entryFiles.find((f) => f.startsWith('start.') && f.endsWith('.js'));
+      const appFile = entryFiles.find((f) => f.startsWith('app.') && f.endsWith('.js'));
+
+      const assetFiles = fs.readdirSync(assetsPath);
+      const cssFiles = assetFiles.filter((f) => f.endsWith('.css'));
+
+      const cssLinks = cssFiles
+        .map((css) => `<link rel="stylesheet" href="_app/immutable/assets/${css}">`)
+        .join('\n  ');
+
+      const html = `<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="utf-8" />
-  <link rel="icon" href="/favicon.ico" />
+  <link rel="icon" href="favicon.ico" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>RAG 기반 회의 분석 시스템</title>
+  ${startFile ? `<link rel="modulepreload" href="_app/immutable/entry/${startFile}">` : ''}
+  ${appFile ? `<link rel="modulepreload" href="_app/immutable/entry/${appFile}">` : ''}
+  ${cssLinks}
 </head>
 <body>
   <div id="app"></div>
-  <script type="module" src="/_app/immutable/entry/start.js"></script>
+  ${startFile ? `<script type="module" data-sveltekit-hydrate="1" src="_app/immutable/entry/${startFile}"></script>` : ''}
 </body>
 </html>`;
-    res.send(html);
+      res.send(html);
+    } catch (e) {
+      res.status(500).send('App bootstrap error');
+    }
   });
 }
 
