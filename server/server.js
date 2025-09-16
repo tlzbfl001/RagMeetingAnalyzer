@@ -86,10 +86,34 @@ if (process.env.NODE_ENV === 'production') {
   <link rel="stylesheet" href="/_app/immutable/assets/0.CU-iK7J7.css">
   <link rel="stylesheet" href="/_app/immutable/assets/2.CE1HdMtk.css">
   <link rel="stylesheet" href="/_app/immutable/assets/3.D86D8tp2.css">
+  <style>
+    body { 
+      font-family: Arial, sans-serif; 
+      margin: 0; 
+      padding: 20px; 
+      background: #f5f5f5; 
+    }
+    .loading { 
+      text-align: center; 
+      color: #666; 
+      margin-top: 50px; 
+    }
+  </style>
 </head>
 <body>
+  <div class="loading">RAG 시스템 로딩 중...</div>
   <div id="app"></div>
   <script type="module" data-sveltekit-hydrate="1" src="/_app/immutable/entry/start.DNMOwlfi.js"></script>
+  <script>
+    // 디버깅용 스크립트
+    console.log('HTML 로드됨');
+    setTimeout(() => {
+      const app = document.getElementById('app');
+      if (app && app.innerHTML.trim() === '') {
+        app.innerHTML = '<div style="text-align: center; margin-top: 50px; color: #666;">SvelteKit 앱 로딩 중...<br><small>JavaScript가 로드되지 않았을 수 있습니다.</small></div>';
+      }
+    }, 3000);
+  </script>
 </body>
 </html>`;
     res.send(html);
