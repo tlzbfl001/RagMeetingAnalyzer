@@ -66,6 +66,17 @@ app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 // 정적 파일 서빙
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
+// SvelteKit 빌드된 정적 파일 서빙 (프로덕션 환경)
+if (process.env.NODE_ENV === 'production') {
+  const buildPath = path.join(__dirname, '..', 'build');
+  app.use(express.static(buildPath));
+  
+  // SPA 라우팅을 위한 fallback
+  app.get('*', (req, res) => {
+    res.sendFile(path.join(buildPath, 'index.html'));
+  });
+}
+
 // 파일 업로드 설정
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
