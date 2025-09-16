@@ -73,7 +73,7 @@ if (process.env.NODE_ENV === 'production') {
   
   // SPA 라우팅을 위한 fallback - 실제 SvelteKit 앱 서빙
   app.get('*', (req, res) => {
-    // SvelteKit 앱의 실제 HTML 템플릿
+    // SvelteKit 앱의 실제 HTML 템플릿 (실제 파일명 사용)
     const html = `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -81,18 +81,15 @@ if (process.env.NODE_ENV === 'production') {
   <link rel="icon" href="/favicon.ico" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>RAG 기반 회의 분석 시스템</title>
-  <link rel="modulepreload" href="/_app/immutable/entry/start.js">
-  <link rel="modulepreload" href="/_app/immutable/chunks/index.js">
-  <link rel="modulepreload" href="/_app/immutable/chunks/singletons.js">
-  <link rel="modulepreload" href="/_app/immutable/chunks/paths.js">
-  <link rel="modulepreload" href="/_app/immutable/chunks/scheduler.js">
-  <link rel="modulepreload" href="/_app/immutable/chunks/singletons.js">
-  <link rel="modulepreload" href="/_app/immutable/entry/app.js">
-  <link rel="stylesheet" href="/_app/immutable/assets/0.css">
+  <link rel="modulepreload" href="/_app/immutable/entry/start.DNMOwlfi.js">
+  <link rel="modulepreload" href="/_app/immutable/entry/app.CPN7jiNP.js">
+  <link rel="stylesheet" href="/_app/immutable/assets/0.CU-iK7J7.css">
+  <link rel="stylesheet" href="/_app/immutable/assets/2.CE1HdMtk.css">
+  <link rel="stylesheet" href="/_app/immutable/assets/3.D86D8tp2.css">
 </head>
 <body>
   <div id="app"></div>
-  <script type="module" data-sveltekit-hydrate="1" src="/_app/immutable/entry/start.js"></script>
+  <script type="module" data-sveltekit-hydrate="1" src="/_app/immutable/entry/start.DNMOwlfi.js"></script>
 </body>
 </html>`;
     res.send(html);
