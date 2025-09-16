@@ -107,12 +107,24 @@ if (process.env.NODE_ENV === 'production') {
   <script>
     // 디버깅용 스크립트
     console.log('HTML 로드됨');
-    setTimeout(() => {
-      const app = document.getElementById('app');
-      if (app && app.innerHTML.trim() === '') {
-        app.innerHTML = '<div style="text-align: center; margin-top: 50px; color: #666;">SvelteKit 앱 로딩 중...<br><small>JavaScript가 로드되지 않았을 수 있습니다.</small></div>';
-      }
-    }, 3000);
+    console.log('SvelteKit hydration 시작...');
+    
+    // SvelteKit이 로드되었는지 확인
+    window.addEventListener('load', () => {
+      console.log('페이지 로드 완료');
+      setTimeout(() => {
+        const app = document.getElementById('app');
+        console.log('App element:', app);
+        console.log('App innerHTML:', app.innerHTML);
+        
+        if (app && app.innerHTML.trim() === '') {
+          console.log('SvelteKit 앱이 로드되지 않음');
+          app.innerHTML = '<div style="text-align: center; margin-top: 50px; color: #666;">SvelteKit 앱 로딩 중...<br><small>JavaScript가 로드되지 않았을 수 있습니다.</small></div>';
+        } else {
+          console.log('SvelteKit 앱이 정상적으로 로드됨');
+        }
+      }, 5000);
+    });
   </script>
 </body>
 </html>`;
