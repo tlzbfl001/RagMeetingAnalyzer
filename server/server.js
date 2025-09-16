@@ -6,6 +6,8 @@ import multer from 'multer';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import fs from 'fs';
+// SvelteKit Node 어댑터 핸들러 (prod에서 CSR/SSR 라우팅 담당)
+import { handler } from '../build/handler';
 // S3 관련 import 제거
 
 // 환경변수 로드
@@ -66,50 +68,8 @@ app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 // 정적 파일 서빙
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
-// SvelteKit 빌드된 정적 파일 서빙 (프로덕션 환경)
-if (process.env.NODE_ENV === 'production') {
-  const buildPath = path.join(__dirname, '..', '.svelte-kit/output/client');
-  app.use(express.static(buildPath));
-  
-  // SPA 라우팅을 위한 fallback - 실제 빌드 파일명 사용(상대경로)
-  app.get('*', (req, res) => {
-    try {
-      const entryPath = path.join(buildPath, '_app/immutable/entry');
-      const assetsPath = path.join(buildPath, '_app/immutable/assets');
-
-      const entryFiles = fs.readdirSync(entryPath);
-      const startFile = entryFiles.find((f) => f.startsWith('start.') && f.endsWith('.js'));
-      const appFile = entryFiles.find((f) => f.startsWith('app.') && f.endsWith('.js'));
-
-      const assetFiles = fs.readdirSync(assetsPath);
-      const cssFiles = assetFiles.filter((f) => f.endsWith('.css'));
-
-      const cssLinks = cssFiles
-        .map((css) => `<link rel="stylesheet" href="_app/immutable/assets/${css}">`)
-        .join('\n  ');
-
-      const html = `<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="utf-8" />
-  <link rel="icon" href="favicon.ico" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>RAG 기반 회의 분석 시스템</title>
-  ${startFile ? `<link rel="modulepreload" href="_app/immutable/entry/${startFile}">` : ''}
-  ${appFile ? `<link rel="modulepreload" href="_app/immutable/entry/${appFile}">` : ''}
-  ${cssLinks}
-</head>
-<body>
-  <div id="app"></div>
-  ${startFile ? `<script type="module" data-sveltekit-hydrate="1" src="_app/immutable/entry/${startFile}"></script>` : ''}
-</body>
-</html>`;
-      res.send(html);
-    } catch (e) {
-      res.status(500).send('App bootstrap error');
-    }
-  });
-}
+// SvelteKit 핸들러를 마지막 미들웨어로 등록 (모든 프런트 라우팅 처리)
+app.use(handler);
 
 // 파일 업로드 설정
 const storage = multer.diskStorage({
